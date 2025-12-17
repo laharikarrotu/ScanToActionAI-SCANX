@@ -39,7 +39,7 @@ class PlannerEngine:
             for elem in ui_schema.get("elements", [])
         ])
         
-        prompt = f"""Given this user intent and UI schema, create a step-by-step action plan.
+        prompt = f"""Given this healthcare-related user intent and UI schema, create a step-by-step action plan.
 
 User Intent: {user_intent}
 
@@ -47,6 +47,8 @@ Available UI Elements:
 {elements_text}
 
 Page Type: {ui_schema.get('page_type', 'unknown')}
+
+This is a healthcare context - be careful with sensitive medical information. Focus on helping the user complete medical forms, book appointments, understand prescriptions, or extract insurance information.
 
 Create a JSON plan with this structure:
 {{
@@ -65,11 +67,13 @@ Create a JSON plan with this structure:
 
 Rules:
 - Use element IDs from the schema
-- Order steps logically (fill forms before clicking submit)
+- Order steps logically (fill medical forms before clicking submit)
+- For healthcare forms: fill patient info, medical history, insurance details in logical order
 - Include waits if needed (e.g., after navigation)
-- Be specific with values (dates, text, etc.)
+- Be specific with values (dates, text, medical information)
 - Only use actions that make sense for the element type
 - Don't include destructive actions unless explicitly requested
+- For medical data: be accurate and preserve formatting (especially for dates, dosages, medical codes)
 
 Return ONLY valid JSON, no other text."""
 

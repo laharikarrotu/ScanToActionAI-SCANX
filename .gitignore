@@ -68,3 +68,14 @@ uploads/
 htmlcov/
 .pytest_cache/
 
+# Documentation (keep README.md and REQUIREMENTS.md, ignore planning/docs)
+HEALTHCARE_PIVOT.md
+HIPAA_NOTES.md
+UNIQUE_FEATURES.md
+DIET_FEATURE.md
+DIET_PORTAL_PLAN.md
+SUPABASE_SETUP.md
+app/frontend/README.md
+mobile/README.md
+*.md.backup
+

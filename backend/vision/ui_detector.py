@@ -32,7 +32,9 @@ class VisionEngine:
         image_base64 = base64.b64encode(image_data).decode('utf-8')
         
         # Build prompt
-        prompt = """Analyze this interface screenshot and extract all interactive and important elements.
+        prompt = """Analyze this healthcare-related interface (medical form, prescription, insurance card, appointment booking, etc.) and extract all interactive and important elements.
+        
+This could be a medical form, prescription label, insurance card, appointment booking page, patient portal, or other healthcare document.
         
 Return a JSON object with this structure:
 {
@@ -50,11 +52,14 @@ Return a JSON object with this structure:
 }
 
 Focus on:
+- Medical form fields (patient name, DOB, SSN, insurance info, medical history, symptoms)
+- Prescription information (medication name, dosage, instructions, refills)
+- Insurance card details (member ID, group number, policy holder)
+- Appointment booking elements (date pickers, time slots, provider selection)
 - Buttons and clickable elements
 - Input fields and their labels
-- Important text (prices, dates, names)
+- Important healthcare information (dates, names, medical terms, dosages)
 - Navigation elements
-- Form fields
 
 Be thorough - include all actionable elements."""
         

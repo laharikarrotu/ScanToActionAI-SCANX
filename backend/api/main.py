@@ -14,28 +14,47 @@ from vision.ui_detector import VisionEngine, UISchema
 from planner.agent_planner import PlannerEngine, ActionPlan
 from executor.browser_executor import BrowserExecutor, ExecutionResult
 from memory.event_log import EventLogger
+from api.auth import create_access_token, verify_token
+from medication.prescription_extractor import PrescriptionExtractor
+from medication.interaction_checker import InteractionChecker, Medication
+from nutrition.diet_advisor import DietAdvisor
+from nutrition.food_scanner import FoodScanner
+from fastapi import Depends
 import hashlib
 
 class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     allowed_domains: str = ""
     openai_api_key: Optional[str] = None
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24
     
     class Config:
         env_file = ".env"
 
 settings = Settings()
 
+# Parse allowed origins (comma-separated or single URL)
+allowed_origins = [url.strip() for url in settings.frontend_url.split(",")]
+allowed_origins.append("http://localhost:3000")  # Always allow localhost for dev
+# Allow Expo Go and mobile apps
+allowed_origins.extend([
+    "exp://192.168.1.97:8081",  # Expo dev server
+    "exp://localhost:8081",
+])
+allowed_origins = list(set(allowed_origins))  # Remove duplicates
+
 app = FastAPI(
-    title="SCANX API",
-    description="Vision-grounded AI agent backend",
+    title="HealthScan API",
+    description="AI healthcare assistant backend - helps with medical forms, prescriptions, and healthcare paperwork",
     version="0.1.0"
 )
 
-# CORS
+# CORS - supports multiple origins (localhost + Vercel)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +64,11 @@ app.add_middleware(
 vision_engine = VisionEngine(api_key=settings.openai_api_key)
 planner_engine = PlannerEngine(api_key=settings.openai_api_key)
 event_logger = EventLogger()
+prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
+interaction_checker = InteractionChecker()
+diet_advisor = DietAdvisor(api_key=settings.openai_api_key)
+condition_advisor = ConditionAdvisor()
+food_scanner = FoodScanner(api_key=settings.openai_api_key)
 
 @app.get("/")
 async def root():
@@ -53,6 +77,23 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+# Optional: Simple login endpoint (for demo - replace with real auth later)
+@app.post("/login")
+async def login(username: str = Form(...), password: str = Form(...)):
+    """
+    Simple login - replace with real user validation
+    For now, accepts any username/password for demo
+    """
+    # TODO: Add real user validation against database
+    access_token = create_access_token(data={"sub": username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Example protected route
+@app.get("/protected")
+async def protected_route(current_user: dict = Depends(verify_token)):
+    """Example protected route requiring JWT auth"""
+    return {"message": f"Hello {current_user.get('sub')}, you are authenticated"}
 
 class AnalyzeRequest(BaseModel):
     intent: str
@@ -158,4 +199,80 @@ async def analyze_only(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/check-prescription-interactions")
+async def check_prescription_interactions(
+    files: List[UploadFile] = File(...),
+    allergies: Optional[str] = Form(None)
+):
+    """
+    UNIQUE FEATURE: Multi-prescription drug interaction checker
+    
+    Scans multiple prescription images and checks for:
+    - Drug-drug interactions
+    - Allergy conflicts
+    - Dosage concerns
+    
+    This is HealthScan's unique differentiator!
+    """
+    try:
+        import asyncio
+        
+        # Extract medication info from all prescriptions
+        medications = []
+        prescription_details = []
+        
+        for file in files:
+            image_data = await file.read()
+            prescription = prescription_extractor.extract_from_image(image_data)
+            prescription_details.append(prescription.model_dump())
+            
+            # Convert to Medication object for interaction checking
+            medications.append(Medication(
+                name=prescription.medication_name,
+                dosage=prescription.dosage,
+                frequency=prescription.frequency
+            ))
+        
+        # Parse allergies if provided
+        allergy_list = []
+        if allergies:
+            allergy_list = [a.strip() for a in allergies.split(",")]
+        
+        # Check for interactions
+        warnings = await interaction_checker.check_interactions(
+            medications=medications,
+            allergies=allergy_list if allergy_list else None
+        )
+        
+        # Organize warnings by severity
+        major_warnings = [w for w in warnings if w.severity == "major"]
+        moderate_warnings = [w for w in warnings if w.severity == "moderate"]
+        minor_warnings = [w for w in warnings if w.severity == "minor"]
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "prescriptions": prescription_details,
+                "medications_found": len(medications),
+                "interactions": {
+                    "total": len(warnings),
+                    "major": [w.model_dump() for w in major_warnings],
+                    "moderate": [w.model_dump() for w in moderate_warnings],
+                    "minor": [w.model_dump() for w in minor_warnings]
+                },
+                "has_interactions": len(warnings) > 0,
+                "message": f"Found {len(warnings)} potential interaction(s)" if warnings else "No interactions detected"
+            }
+        )
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
 

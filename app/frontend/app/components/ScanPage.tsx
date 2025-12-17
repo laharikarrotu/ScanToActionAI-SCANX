@@ -73,11 +73,11 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-900 to-black text-white p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">SCANX</h1>
-          <p className="text-zinc-400">Scan any interface and turn it into actions</p>
+          <h1 className="text-4xl font-bold mb-2">HealthScan</h1>
+          <p className="text-blue-300">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -136,23 +136,26 @@ export default function ScanPage() {
 
           {/* Intent Input */}
           <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-xl font-semibold mb-4">2. What do you want to do?</h2>
+            <h2 className="text-xl font-semibold mb-4">2. What do you need help with?</h2>
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder="e.g., Book this hotel for 2 nights starting Friday"
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-green-500"
+              placeholder="e.g., Fill out this patient intake form, Book an appointment for next week, Help me understand this prescription, Extract my insurance information"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
               rows={3}
             />
+            <p className="text-sm text-zinc-500 mt-2">
+              Examples: Fill medical forms • Book appointments • Read prescriptions • Extract insurance info
+            </p>
           </div>
 
           {/* Submit Button */}
           <button
             type="submit"
             disabled={loading || !image || !intent.trim()}
-            className="w-full bg-green-500 hover:bg-green-600 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors"
           >
-            {loading ? 'Processing...' : 'Scan & Execute'}
+            {loading ? 'Processing...' : 'Scan & Help'}
           </button>
 
           {error && (

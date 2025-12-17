@@ -1,0 +1,248 @@
+"""
+Diet Advisor - Provides diet recommendations based on medical conditions
+"""
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+from openai import OpenAI
+import os
+
+class DietRecommendation(BaseModel):
+    condition: str
+    foods_to_eat: List[str]
+    foods_to_avoid: List[str]
+    meal_plan_suggestion: str
+    nutritional_focus: str
+    warnings: List[str] = []
+
+class MedicationFoodInteraction(BaseModel):
+    medication: str
+    food: str
+    interaction_type: str  # "avoid", "limit", "timing"
+    description: str
+    severity: str  # "major", "moderate", "minor"
+
+class DietAdvisor:
+    """
+    Provides personalized diet recommendations based on medical conditions
+    """
+    
+    def __init__(self, api_key: Optional[str] = None):
+        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.model = "gpt-4o"
+        
+        # Common medication-food interactions
+        self.medication_food_interactions = {
+            "warfarin": {
+                "avoid": ["leafy greens (high vitamin K)", "cranberry juice"],
+                "limit": ["alcohol"],
+                "description": "Vitamin K can interfere with warfarin effectiveness"
+            },
+            "maoi": {
+                "avoid": ["aged cheeses", "fermented foods", "cured meats", "red wine"],
+                "description": "Tyramine in these foods can cause dangerous blood pressure spikes"
+            },
+            "grapefruit": {
+                "medications": ["statins", "calcium channel blockers", "some antidepressants"],
+                "avoid": ["grapefruit", "grapefruit juice"],
+                "description": "Grapefruit can increase medication levels in blood"
+            },
+            "digoxin": {
+                "avoid": ["licorice", "high-fiber foods (timing)"],
+                "description": "Can affect absorption"
+            }
+        }
+    
+    def get_diet_recommendations(
+        self, 
+        condition: str,
+        medications: Optional[List[str]] = None,
+        dietary_restrictions: Optional[List[str]] = None
+    ) -> DietRecommendation:
+        """
+        Get diet recommendations for a specific medical condition
+        """
+        prompt = f"""Provide diet and nutrition recommendations for someone with: {condition}
+
+Consider:
+- Foods that help manage/improve this condition
+- Foods to avoid that might worsen symptoms
+- Nutritional focus (e.g., low sodium, high fiber, anti-inflammatory)
+- Sample meal plan approach
+
+Return a JSON object:
+{{
+  "condition": "{condition}",
+  "foods_to_eat": ["list of recommended foods"],
+  "foods_to_avoid": ["list of foods to avoid"],
+  "meal_plan_suggestion": "brief description of meal planning approach",
+  "nutritional_focus": "main nutritional goals (e.g., 'Low sodium, high potassium, heart-healthy fats')",
+  "warnings": ["any important warnings about diet and this condition"]
+}}
+
+Be specific and practical. Focus on evidence-based recommendations."""
+
+        if medications:
+            prompt += f"\n\nCurrent medications: {', '.join(medications)}"
+        
+        if dietary_restrictions:
+            prompt += f"\n\nDietary restrictions: {', '.join(dietary_restrictions)}"
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a medical nutritionist. Provide evidence-based dietary advice."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            
+            result_text = response.choices[0].message.content
+            import json
+            result_dict = json.loads(result_text)
+            
+            # Check for medication-food interactions
+            warnings = result_dict.get("warnings", [])
+            if medications:
+                for med in medications:
+                    med_lower = med.lower()
+                    interactions = self._check_medication_food_interactions(med_lower)
+                    for interaction in interactions:
+                        warnings.append(interaction)
+            
+            result_dict["warnings"] = warnings
+            
+            return DietRecommendation(**result_dict)
+            
+        except Exception as e:
+            # Fallback recommendations
+            return DietRecommendation(
+                condition=condition,
+                foods_to_eat=["Consult with a registered dietitian"],
+                foods_to_avoid=["Consult with a registered dietitian"],
+                meal_plan_suggestion="Please consult with a healthcare provider for personalized meal planning",
+                nutritional_focus="Personalized nutrition plan needed",
+                warnings=[f"Error generating recommendations: {str(e)}"]
+            )
+    
+    def _check_medication_food_interactions(self, medication: str) -> List[str]:
+        """Check for known medication-food interactions"""
+        warnings = []
+        
+        # Check direct matches
+        if medication in self.medication_food_interactions:
+            interaction = self.medication_food_interactions[medication]
+            if "avoid" in interaction:
+                foods = ", ".join(interaction["avoid"])
+                warnings.append(f"⚠️ {medication.title()}: Avoid {foods}. {interaction.get('description', '')}")
+        
+        # Check for grapefruit interactions
+        if "grapefruit" in medication or any(med in medication for med in ["atorvastatin", "simvastatin", "felodipine"]):
+            warnings.append("⚠️ Avoid grapefruit and grapefruit juice - can increase medication levels")
+        
+        return warnings
+    
+    def check_food_compatibility(
+        self,
+        food_item: str,
+        condition: Optional[str] = None,
+        medications: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Check if a specific food is compatible with user's condition/medications
+        """
+        compatibility = {
+            "food": food_item,
+            "safe": True,
+            "warnings": [],
+            "recommendations": []
+        }
+        
+        # Check medication interactions
+        if medications:
+            for med in medications:
+                med_lower = med.lower()
+                if med_lower in self.medication_food_interactions:
+                    interaction = self.medication_food_interactions[med_lower]
+                    if "avoid" in interaction:
+                        for avoid_food in interaction["avoid"]:
+                            if avoid_food.lower() in food_item.lower() or food_item.lower() in avoid_food.lower():
+                                compatibility["safe"] = False
+                                compatibility["warnings"].append(
+                                    f"{med} interaction: {interaction.get('description', 'May interact with medication')}"
+                                )
+        
+        # Check condition-specific concerns
+        if condition:
+            condition_lower = condition.lower()
+            if "diabetes" in condition_lower:
+                high_sugar_foods = ["sugar", "candy", "soda", "juice", "dessert"]
+                if any(food in food_item.lower() for food in high_sugar_foods):
+                    compatibility["recommendations"].append("Monitor blood sugar - high sugar content")
+            
+            if "hypertension" in condition_lower or "high blood pressure" in condition_lower:
+                high_sodium_foods = ["salt", "sodium", "processed", "canned"]
+                if any(food in food_item.lower() for food in high_sodium_foods):
+                    compatibility["recommendations"].append("High sodium - limit intake if managing blood pressure")
+        
+        return compatibility
+    
+    def generate_meal_plan(
+        self,
+        condition: str,
+        days: int = 7,
+        dietary_restrictions: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a weekly meal plan for a specific condition
+        """
+        prompt = f"""Create a {days}-day meal plan for someone with {condition}.
+
+Include:
+- Breakfast, lunch, dinner, and 2 snacks per day
+- Specific food items and portions
+- Nutritional notes for each meal
+- Shopping list
+
+Return JSON:
+{{
+  "condition": "{condition}",
+  "days": {days},
+  "meal_plan": [
+    {{
+      "day": 1,
+      "breakfast": {{"meal": "...", "nutrition_notes": "..."}},
+      "lunch": {{"meal": "...", "nutrition_notes": "..."}},
+      "dinner": {{"meal": "...", "nutrition_notes": "..."}},
+      "snacks": ["...", "..."]
+    }}
+  ],
+  "shopping_list": ["list of ingredients"],
+  "nutritional_goals": "overall goals for this meal plan"
+}}"""
+
+        if dietary_restrictions:
+            prompt += f"\n\nDietary restrictions: {', '.join(dietary_restrictions)}"
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a registered dietitian creating personalized meal plans."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.4
+            )
+            
+            result_text = response.choices[0].message.content
+            import json
+            return json.loads(result_text)
+            
+        except Exception as e:
+            return {
+                "error": str(e),
+                "message": "Please consult with a registered dietitian for a personalized meal plan"
+            }
+
