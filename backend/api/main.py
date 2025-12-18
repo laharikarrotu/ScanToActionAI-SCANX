@@ -18,8 +18,9 @@ from api.auth import create_access_token, verify_token
 from medication.prescription_extractor import PrescriptionExtractor
 from medication.interaction_checker import InteractionChecker, Medication
 from nutrition.diet_advisor import DietAdvisor
-from nutrition.food_scanner import FoodScanner
 from fastapi import Depends
+from api.rate_limiter import RateLimiter
+from fastapi import Request
 import hashlib
 
 class Settings(BaseSettings):
@@ -67,6 +68,7 @@ event_logger = EventLogger()
 prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
 interaction_checker = InteractionChecker()
 diet_advisor = DietAdvisor(api_key=settings.openai_api_key)
+rate_limiter = RateLimiter(max_requests=20, window_seconds=60)  # 20 requests per minute
 condition_advisor = ConditionAdvisor()
 food_scanner = FoodScanner(api_key=settings.openai_api_key)
 
@@ -101,6 +103,7 @@ class AnalyzeRequest(BaseModel):
 
 @app.post("/analyze-and-execute")
 async def analyze_and_execute(
+    request: Request,
     file: UploadFile = File(...),
     intent: str = Form(...),
     context: Optional[str] = Form(None)
@@ -108,21 +111,59 @@ async def analyze_and_execute(
     """
     Main endpoint: Takes image + intent, analyzes, plans, and executes
     """
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Please try again in a moment. ({remaining} requests remaining)"
+        )
+    
     try:
-        # Read image
+        # Validate input
+        if not intent or not intent.strip():
+            raise HTTPException(status_code=400, detail="Intent is required")
+        
+        if len(intent) > 500:
+            raise HTTPException(status_code=400, detail="Intent is too long (max 500 characters)")
+        
+        # Read and validate image
         image_data = await file.read()
+        
+        # Check file size (max 10MB)
+        if len(image_data) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image is too large (max 10MB)")
+        
+        # Check file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
         image_hash = hashlib.md5(image_data).hexdigest()
         
         # Log request
         event_logger.log_scan_request(image_hash, intent)
         
         # Step 1: Vision - Understand UI
-        ui_schema = vision_engine.analyze_image(image_data)
-        ui_schema_dict = ui_schema.model_dump()
-        event_logger.log_ui_schema(ui_schema_dict)
+        try:
+            ui_schema = vision_engine.analyze_image(image_data)
+            ui_schema_dict = ui_schema.model_dump()
+            event_logger.log_ui_schema(ui_schema_dict)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Vision analysis failed: {str(e)}. Please check your OpenAI API key and credits."
+            )
         
         if not ui_schema.elements:
-            raise HTTPException(status_code=400, detail="Could not detect UI elements")
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "no_elements",
+                    "message": "Could not detect UI elements in the image. Try a clearer image or different angle.",
+                    "ui_schema": ui_schema_dict
+                }
+            )
         
         # Step 2: Planning - Create action plan
         plan = planner_engine.create_plan(
@@ -172,12 +213,20 @@ async def analyze_and_execute(
         finally:
             await executor.close()
             
+    except HTTPException:
+        raise
     except Exception as e:
+        error_msg = str(e)
+        # Log the full error for debugging
+        event_logger.log_event("error", {"error": error_msg, "endpoint": "analyze-and-execute"})
+        
+        # Return user-friendly error
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": "An error occurred while processing your request. Please try again.",
+                "error_type": type(e).__name__
             }
         )
 

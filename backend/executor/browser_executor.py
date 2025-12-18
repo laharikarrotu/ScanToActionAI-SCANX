@@ -45,10 +45,9 @@ class BrowserExecutor:
         if self.browser:
             await self.browser.close()
     
-    def _find_element_selector(self, element_id: str, ui_schema: Dict[str, Any]) -> Optional[str]:
+    async def _find_element_selector(self, element_id: str, ui_schema: Dict[str, Any], page: Page) -> Optional[str]:
         """
-        Maps element ID from schema to Playwright selector
-        This is the tricky part - heuristic matching
+        Improved element selector matching with multiple fallback strategies
         """
         # Find element in schema
         element = None
@@ -63,27 +62,59 @@ class BrowserExecutor:
         elem_type = element.get("type", "")
         label = element.get("label", "")
         value = element.get("value", "")
+        position = element.get("position", {})
         
-        # Heuristic selectors based on type and label
-        if elem_type == "button":
-            # Try multiple strategies
-            if label:
-                # Text-based selector
-                return f'button:has-text("{label}")'
-            return "button"
+        # Strategy 1: Try exact text match
+        if label:
+            selectors_to_try = []
+            
+            if elem_type == "button":
+                selectors_to_try = [
+                    f'button:has-text("{label}")',
+                    f'button[aria-label*="{label}"]',
+                    f'input[type="button"][value*="{label}"]',
+                    f'input[type="submit"][value*="{label}"]',
+                    f'[role="button"]:has-text("{label}")',
+                ]
+            elif elem_type == "input":
+                selectors_to_try = [
+                    f'input[placeholder*="{label}"]',
+                    f'input[name*="{label.lower().replace(" ", "_")}"]',
+                    f'input[id*="{label.lower().replace(" ", "_")}"]',
+                    f'label:has-text("{label}") + input',
+                    f'label:has-text("{label}") ~ input',
+                ]
+            elif elem_type == "link":
+                selectors_to_try = [
+                    f'a:has-text("{label}")',
+                    f'a[href*="{label.lower()}"]',
+                ]
+            elif elem_type == "select":
+                selectors_to_try = [
+                    f'select[name*="{label.lower().replace(" ", "_")}"]',
+                    f'label:has-text("{label}") + select',
+                ]
+            
+            # Try each selector
+            for selector in selectors_to_try:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    if elements and len(elements) > 0:
+                        return selector
+                except:
+                    continue
         
-        elif elem_type == "input":
-            if label:
-                # Try to find input near label
-                return f'input[placeholder*="{label}"]'
-            return "input"
+        # Strategy 2: Try by type only (fallback)
+        type_selectors = {
+            "button": "button",
+            "input": "input",
+            "link": "a",
+            "select": "select",
+        }
         
-        elif elem_type == "link":
-            if label:
-                return f'a:has-text("{label}")'
-            return "a"
+        if elem_type in type_selectors:
+            return type_selectors[elem_type]
         
-        # Fallback
         return None
     
     async def execute_plan(
@@ -111,39 +142,85 @@ class BrowserExecutor:
                 await self.page.goto(start_url, wait_until="networkidle")
             
             # Execute each step
+            successful_steps = 0
             for step in steps:
                 result.logs.append(f"Step {step.step}: {step.action} on {step.target}")
                 
-                selector = self._find_element_selector(step.target, ui_schema)
+                selector = await self._find_element_selector(step.target, ui_schema, self.page)
                 
                 if not selector:
-                    result.logs.append(f"Warning: Could not find selector for {step.target}")
-                    continue
+                    result.logs.append(f"⚠️ Warning: Could not find selector for {step.target}")
+                    # Try to find by partial match
+                    element = next((e for e in ui_schema.get("elements", []) if e.get("id") == step.target), None)
+                    if element and element.get("label"):
+                        # Last resort: try fuzzy text search
+                        try:
+                            text_selector = f'text="{element.get("label")}"'
+                            await self.page.wait_for_selector(text_selector, timeout=2000, state="visible")
+                            selector = text_selector
+                            result.logs.append(f"✓ Found element using text search")
+                        except:
+                            result.logs.append(f"✗ Skipping step {step.step} - element not found")
+                            continue
+                    else:
+                        continue
                 
                 try:
+                    # Wait for element to be visible
+                    await self.page.wait_for_selector(selector, timeout=5000, state="visible")
+                    
                     if step.action == "click":
                         await self.page.click(selector, timeout=5000)
-                        await asyncio.sleep(0.5)  # Small delay
+                        await asyncio.sleep(0.5)
+                        result.logs.append(f"✓ Clicked {step.target}")
+                        successful_steps += 1
                     
                     elif step.action == "fill":
                         await self.page.fill(selector, step.value or "", timeout=5000)
+                        await asyncio.sleep(0.3)
+                        result.logs.append(f"✓ Filled {step.target} with '{step.value}'")
+                        successful_steps += 1
                     
                     elif step.action == "select":
                         await self.page.select_option(selector, step.value or "", timeout=5000)
+                        result.logs.append(f"✓ Selected '{step.value}' in {step.target}")
+                        successful_steps += 1
                     
                     elif step.action == "navigate":
-                        await self.page.goto(step.value or "", wait_until="networkidle")
+                        await self.page.goto(step.value or "", wait_until="networkidle", timeout=30000)
+                        result.logs.append(f"✓ Navigated to {step.value}")
+                        successful_steps += 1
                     
                     elif step.action == "wait":
-                        await asyncio.sleep(int(step.value or 1))
+                        wait_time = int(step.value or 1)
+                        await asyncio.sleep(wait_time)
+                        result.logs.append(f"✓ Waited {wait_time}s")
+                        successful_steps += 1
                     
                     elif step.action == "read":
                         text = await self.page.text_content(selector)
-                        result.logs.append(f"Read: {text}")
+                        result.logs.append(f"✓ Read: {text[:50]}...")
+                        successful_steps += 1
                     
                 except Exception as e:
-                    result.logs.append(f"Error in step {step.step}: {str(e)}")
-                    # Continue with next step
+                    error_msg = str(e)
+                    result.logs.append(f"✗ Error in step {step.step}: {error_msg}")
+                    # Don't fail completely, continue with next step
+                    if "timeout" in error_msg.lower():
+                        result.logs.append(f"  → Element not found or not visible")
+                    elif "not attached" in error_msg.lower():
+                        result.logs.append(f"  → Element was removed from DOM")
+            
+            # Determine final status based on success rate
+            if successful_steps == len(steps):
+                result.status = "success"
+                result.message = f"All {successful_steps} steps completed successfully"
+            elif successful_steps > 0:
+                result.status = "partial"
+                result.message = f"Completed {successful_steps}/{len(steps)} steps"
+            else:
+                result.status = "error"
+                result.message = "No steps completed successfully"
             
             # Get final state
             result.final_url = self.page.url
@@ -151,12 +228,10 @@ class BrowserExecutor:
             # Take screenshot
             screenshot_dir = "memory/screenshots"
             os.makedirs(screenshot_dir, exist_ok=True)
-            screenshot_path = f"{screenshot_dir}/result_{int(asyncio.get_event_loop().time())}.png"
-            await self.page.screenshot(path=screenshot_path)
+            import time
+            screenshot_path = f"{screenshot_dir}/result_{int(time.time())}.png"
+            await self.page.screenshot(path=screenshot_path, full_page=True)
             result.screenshot_path = screenshot_path
-            
-            result.status = "success"
-            result.message = "Execution completed"
             
         except Exception as e:
             result.status = "error"
