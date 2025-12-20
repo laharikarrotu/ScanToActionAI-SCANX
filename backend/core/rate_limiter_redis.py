@@ -34,7 +34,8 @@ class RedisRateLimiter:
             )
             self.client.ping()
         except Exception as e:
-            print(f"Redis rate limiter connection failed: {e}")
+            import logging
+            logging.warning(f"Redis rate limiter connection failed: {e}", exc_info=True)
             self.client = None
     
     def is_allowed(
@@ -89,7 +90,8 @@ class RedisRateLimiter:
             return is_allowed, remaining
             
         except Exception as e:
-            print(f"Rate limiter error: {e}")
+            import logging
+            logging.error(f"Rate limiter error: {e}", exc_info=True)
             # Fail open - allow request if Redis fails
             return True, max_requests
     
@@ -102,5 +104,6 @@ class RedisRateLimiter:
         try:
             self.client.delete(key)
         except Exception as e:
-            print(f"Rate limiter reset error: {e}")
+            import logging
+            logging.error(f"Rate limiter reset error: {e}", exc_info=True)
 

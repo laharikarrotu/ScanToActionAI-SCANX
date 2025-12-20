@@ -19,13 +19,11 @@ export interface PrescriptionData {
   imagePreview?: string;
 }
 
+import type { InteractionWarnings, PrescriptionDetail } from '../lib/types';
+
 export interface InteractionResult {
-  warnings: {
-    major: any[];
-    moderate: any[];
-    minor: any[];
-  };
-  prescription_details: any[];
+  warnings: InteractionWarnings;
+  prescription_details: PrescriptionDetail[];
 }
 
 export interface DietData {

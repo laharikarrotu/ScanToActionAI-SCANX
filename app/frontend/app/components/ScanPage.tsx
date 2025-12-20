@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyzeAndExecute, extractPrescription } from '../lib/api';
+import type { AnalyzeResponse, ActionStep, UIElement, Medication } from '../lib/types';
 import ProgressIndicator from './ProgressIndicator';
 import ProgressTracker from './ProgressTracker';
 import { useHealthScan } from '../context/HealthScanContext';
@@ -26,7 +27,7 @@ export default function ScanPage() {
   const [progressStep, setProgressStep] = useState(0);
   const [progressMessage, setProgressMessage] = useState<string>('');
   const [progressPercent, setProgressPercent] = useState<number>(0);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -165,17 +166,17 @@ export default function ScanPage() {
         setResult(response);
         setProgressStep(4); // Complete
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setProgressStep(0);
       // Better error messages
-      const errorMsg = err.message || 'Something went wrong. Please try again.';
+      const errorMsg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setLocalError(errorMsg);
       
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
         setError('scan', 'Cannot connect to server. Make sure the backend is running on http://localhost:8000');
-      } else if (err.message?.includes('401') || err.message?.includes('403')) {
+      } else if (errorMsg.includes('401') || errorMsg.includes('403')) {
         setError('scan', 'Authentication failed. Please check your API keys.');
-      } else if (err.message?.includes('429')) {
+      } else if (errorMsg.includes('429')) {
         setError('scan', 'Rate limit exceeded. Please try again in a moment.');
       } else {
         setError('scan', errorMsg);
@@ -358,7 +359,7 @@ export default function ScanPage() {
                 <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
                   <h3 className="text-sm font-semibold text-zinc-300 mb-3">Action Plan</h3>
                   <div className="space-y-2">
-                    {result.plan.steps.map((step: any, idx: number) => (
+                    {result.plan.steps.map((step: ActionStep, idx: number) => (
                       <div key={idx} className="flex items-start gap-3 p-2 bg-zinc-800 rounded">
                         <span className="text-blue-400 font-mono text-xs mt-1">{step.step}.</span>
                         <div className="flex-1">
@@ -406,7 +407,7 @@ export default function ScanPage() {
                   <h3 className="text-sm font-semibold text-zinc-300 mb-3">📋 Extracted Prescription Data</h3>
                   <div className="space-y-3">
                     {Array.isArray(result.structured_data.medications) ? (
-                      result.structured_data.medications.map((med: any, idx: number) => (
+                      result.structured_data.medications.map((med: Medication, idx: number) => (
                         <div key={idx} className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
                           <div className="font-semibold text-white mb-2">{med.medication_name || 'Unknown Medication'}</div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -425,10 +426,10 @@ export default function ScanPage() {
                       ))
                     ) : (
                       <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                        <div className="font-semibold text-white mb-2">{result.structured_data.medications.medication_name || 'Medication'}</div>
+                        <div className="font-semibold text-white mb-2">{(result.structured_data.medications as Medication).medication_name || 'Medication'}</div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          {result.structured_data.medications.dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{result.structured_data.medications.dosage}</span></div>}
-                          {result.structured_data.medications.frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{result.structured_data.medications.frequency}</span></div>}
+                          {(result.structured_data.medications as Medication).dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{(result.structured_data.medications as Medication).dosage}</span></div>}
+                          {(result.structured_data.medications as Medication).frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{(result.structured_data.medications as Medication).frequency}</span></div>}
                         </div>
                       </div>
                     )}
@@ -448,10 +449,11 @@ export default function ScanPage() {
                   <div className="mt-4 pt-4 border-t border-zinc-700 flex gap-2 flex-wrap">
                     <button
                       onClick={() => {
+                        if (!result.structured_data?.medications) return;
                         // Store medications in localStorage
-                        const medications = Array.isArray(result.structured_data.medications) 
+                        const medications: Medication[] = Array.isArray(result.structured_data.medications) 
                           ? result.structured_data.medications 
-                          : [result.structured_data.medications];
+                          : [result.structured_data.medications as Medication];
                         localStorage.setItem('extracted_medications', JSON.stringify(medications));
                         localStorage.setItem('prescription_image', imagePreview || '');
                         router.push('/interactions');
@@ -463,11 +465,12 @@ export default function ScanPage() {
                     {result.structured_data.medications && (
                       <button
                         onClick={() => {
+                          if (!result.structured_data?.medications) return;
                           // Store medications for diet portal
-                          const medications = Array.isArray(result.structured_data.medications) 
+                          const medications: Medication[] = Array.isArray(result.structured_data.medications) 
                             ? result.structured_data.medications 
-                            : [result.structured_data.medications];
-                          const medNames = medications.map((m: any) => m.medication_name).join(', ');
+                            : [result.structured_data.medications as Medication];
+                          const medNames = medications.map((m: Medication) => m.medication_name).join(', ');
                           localStorage.setItem('current_medications', medNames);
                           router.push('/diet');
                         }}
@@ -503,7 +506,7 @@ export default function ScanPage() {
                     Detected UI Elements ({result.ui_schema.elements.length})
                   </summary>
                   <div className="p-4 pt-0 space-y-2 max-h-60 overflow-y-auto">
-                    {result.ui_schema.elements.slice(0, 10).map((elem: any, idx: number) => (
+                    {result.ui_schema.elements.slice(0, 10).map((elem: UIElement, idx: number) => (
                       <div key={idx} className="text-xs p-2 bg-zinc-800 rounded">
                         <span className="text-blue-400 font-mono">{elem.type}</span>
                         {elem.label && <span className="text-zinc-300 ml-2">{elem.label}</span>}
@@ -527,7 +530,9 @@ export default function ScanPage() {
                   <button
                     onClick={() => {
                       // Screenshot is stored on backend, show path info
-                      alert(`Screenshot saved at: ${result.execution.screenshot_path}\n(Backend endpoint not implemented yet)`);
+                      if (result.execution?.screenshot_path) {
+                        alert(`Screenshot saved at: ${result.execution.screenshot_path}\n(Backend endpoint not implemented yet)`);
+                      }
                     }}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >

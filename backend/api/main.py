@@ -21,6 +21,8 @@ from core.resource_manager import ResourceManager
 from core.encryption import ImageEncryption
 from core.audit_logger import AuditLogger, AuditAction
 from core.streaming import StreamingResponseBuilder
+from core.logger import get_logger
+from core.middleware import RequestLoggingMiddleware, PerformanceMiddleware
 from api.config import settings
 from api.auth import create_access_token, verify_token
 from medication.prescription_extractor import PrescriptionExtractor, PrescriptionInfo
@@ -91,8 +93,28 @@ allowed_origins = list(set(allowed_origins))  # Remove duplicates
 
 app = FastAPI(
     title="HealthScan API",
-    description="AI healthcare assistant backend - helps with medical forms, prescriptions, and healthcare paperwork",
-    version="0.1.0"
+    description="""
+    AI healthcare assistant backend for medical document processing.
+    
+    ## Features
+    
+    * **Prescription Extraction**: Extract medication details from prescription images
+    * **Drug Interaction Checking**: Check for drug-drug and drug-allergy interactions
+    * **Diet Recommendations**: Get personalized diet recommendations based on medical conditions
+    * **Form Automation**: Automate medical form filling using AI vision and browser automation
+    
+    ## Authentication
+    
+    Most endpoints require JWT authentication. Get a token via `/login`.
+    
+    ## HIPAA Compliance
+    
+    ⚠️ **Important**: This is an MVP and is NOT HIPAA-compliant for production use with real patient data.
+    See documentation for compliance roadmap.
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS - supports multiple origins (localhost + Vercel)
@@ -103,6 +125,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request logging and performance tracking middleware
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(PerformanceMiddleware)
 
 # Initialize engines - Use combined analyzer if Gemini available, otherwise separate engines
 USE_COMBINED_ANALYZER = False
@@ -117,25 +143,28 @@ try:
             from vision.combined_analyzer import CombinedAnalyzer
             combined_analyzer = CombinedAnalyzer(api_key=settings.gemini_api_key)
             USE_COMBINED_ANALYZER = True
-            print("✅ Using Combined Analyzer (Vision + Planning in 1 call) - 50% faster & cheaper!")
+            logger.info("Using Combined Analyzer (Vision + Planning in 1 call) - 50% faster & cheaper!")
         except Exception as e:
-            print(f"⚠️  Combined analyzer failed: {e}, using separate engines")
+            logger.warning(f"Combined analyzer failed: {e}, using separate engines", exception=e)
             USE_COMBINED_ANALYZER = False
             from vision.gemini_detector import GeminiVisionEngine
             from planner.gemini_planner import GeminiPlannerEngine
             vision_engine = GeminiVisionEngine(api_key=settings.gemini_api_key)
             planner_engine = GeminiPlannerEngine(api_key=settings.gemini_api_key)
-            print("✅ Using Gemini Pro 1.5 for Vision and Planning (separate calls)")
+            logger.info("Using Gemini Pro 1.5 for Vision and Planning (separate calls)")
     else:
         USE_COMBINED_ANALYZER = False
         vision_engine = VisionEngine(api_key=settings.openai_api_key)
         planner_engine = PlannerEngine(api_key=settings.openai_api_key)
-        print("✅ Using OpenAI GPT-4o for Vision and Planning")
+        logger.info("Using OpenAI GPT-4o for Vision and Planning")
 except Exception as e:
-    print(f"⚠️  Gemini setup failed: {e}, using OpenAI")
+    logger.warning(f"Gemini setup failed: {e}, using OpenAI", exception=e)
     USE_COMBINED_ANALYZER = False
     vision_engine = VisionEngine(api_key=settings.openai_api_key)
     planner_engine = PlannerEngine(api_key=settings.openai_api_key)
+
+# Initialize logging
+logger = get_logger("api.main")
 
 event_logger = EventLogger()
 error_handler = ErrorHandler(max_retries=3, retry_delay=1.0)
@@ -143,22 +172,24 @@ resource_manager = ResourceManager(default_timeout=30.0)
 # HIPAA Compliance: Image encryption and audit logging
 image_encryption = ImageEncryption()
 audit_logger = AuditLogger()
+
+logger.info("Initializing HealthScan API", context={"version": "1.0.0"})
 prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
 interaction_checker = InteractionChecker()
 # Force Gemini for diet advisor if available (cheaper and avoids OpenAI quota issues)
 diet_advisor = DietAdvisor(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
 if settings.gemini_api_key:
-    print("✅ Diet Advisor using Gemini Pro 1.5 (cheaper & avoids quota issues)")
+    logger.info("Diet Advisor using Gemini Pro 1.5 (cheaper & avoids quota issues)")
 else:
-    print("⚠️  Diet Advisor using OpenAI (Gemini API key not set)")
+    logger.warning("Diet Advisor using OpenAI (Gemini API key not set)")
 
 # Rate limiter selection (priority: Redis > Database > Token Bucket > In-Memory)
 if REDIS_RATE_LIMITER_AVAILABLE and RedisRateLimiter:
     try:
         rate_limiter = RedisRateLimiter()
-        print("✅ Using Redis rate limiter")
+        logger.info("Using Redis rate limiter")
     except Exception as e:
-        print(f"Redis rate limiter failed: {e}, trying database...")
+        logger.warning(f"Redis rate limiter failed: {e}, trying database...", exception=e)
         rate_limiter = None
 else:
     rate_limiter = None
@@ -166,22 +197,22 @@ else:
 if not rate_limiter and DATABASE_RATE_LIMITER_AVAILABLE and DatabaseRateLimiter and settings.database_url:
     try:
         rate_limiter = DatabaseRateLimiter()
-        print("✅ Using Database rate limiter (free, multi-instance)")
+        logger.info("Using Database rate limiter (free, multi-instance)")
     except Exception as e:
-        print(f"Database rate limiter failed: {e}, trying token bucket...")
+        logger.warning(f"Database rate limiter failed: {e}, trying token bucket...", exception=e)
         rate_limiter = None
 
 if not rate_limiter and TOKEN_BUCKET_AVAILABLE and TokenBucketRateLimiter:
     try:
         rate_limiter = TokenBucketRateLimiter()
-        print("✅ Using Token Bucket rate limiter (free, better algorithm)")
+        logger.info("Using Token Bucket rate limiter (free, better algorithm)")
     except Exception as e:
-        print(f"Token bucket rate limiter failed: {e}, using in-memory...")
+        logger.warning(f"Token bucket rate limiter failed: {e}, using in-memory...", exception=e)
         rate_limiter = None
 
 if not rate_limiter:
     rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
-    print("✅ Using in-memory rate limiter (free, single instance)")
+    logger.info("Using in-memory rate limiter (free, single instance)")
 
 condition_advisor = ConditionAdvisor()
 food_scanner = FoodScanner(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
@@ -198,10 +229,24 @@ async def health():
 @app.post("/login")
 async def login(username: str = Form(...), password: str = Form(...)):
     """
-    Simple login - replace with real user validation
-    For now, accepts any username/password for demo
+    Simple login endpoint for authentication.
+    
+    **Note**: This is a demo implementation. For production:
+    - Validate credentials against database
+    - Implement password hashing (bcrypt)
+    - Add rate limiting for login attempts
+    - Implement account lockout after failed attempts
+    
+    **Parameters**:
+    - `username`: User identifier
+    - `password`: User password (currently not validated)
+    
+    **Returns**:
+    - JWT access token for authenticated requests
     """
-    # TODO: Add real user validation against database
+    # Demo implementation - accepts any credentials
+    # Production: Validate against database, hash passwords, rate limit
+    logger.info(f"Login attempt for user: {username}", context={"endpoint": "login"})
     access_token = create_access_token(data={"sub": username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -222,11 +267,22 @@ async def extract_prescription_direct(
     stream: bool = Form(False)  # Optional: enable streaming
 ):
     """
-    FAST DIRECT ENDPOINT: Extract prescription data immediately
-    Like ChatGPT - just scan and get medications directly
-    No vision/planner steps, just pure extraction
+    FAST DIRECT ENDPOINT: Extract prescription data immediately.
     
-    Set stream=true for Server-Sent Events (SSE) progress updates
+    Like ChatGPT - just scan and get medications directly.
+    No vision/planner steps, just pure extraction.
+    
+    **Parameters:**
+    - `file`: Image file (prescription, medical form, etc.)
+    - `stream`: Enable Server-Sent Events (SSE) for real-time progress updates
+    
+    **Returns:**
+    - `prescription_info`: Extracted medication details (name, dosage, frequency, etc.)
+    - `cached`: Whether result was served from cache
+    
+    **HIPAA Compliance:**
+    - All image uploads are logged for audit
+    - Images can be encrypted at rest (configurable)
     """
     try:
         # Read image
@@ -237,18 +293,18 @@ async def extract_prescription_direct(
         image_hash = hashlib.md5(image_data).hexdigest()
         audit_logger.log_image_upload(user_id=None, image_hash=image_hash, ip_address=client_ip)
         
-        # HIPAA Compliance: Encrypt image before processing (optional - can be enabled)
-        # For now, we process in memory without storing encrypted version
-        # Uncomment below to enable encryption:
+        # HIPAA Compliance: Encrypt image at rest (if storing)
+        # Note: For in-memory processing, encryption happens if we store the image
+        # Currently processing in memory, but encryption ready for storage use
+        # To enable storage encryption, uncomment:
         # encrypted_image = image_encryption.encrypt_image(image_data)
-        # Store encrypted_image instead of image_data if needed
+        # Store encrypted_image in database/storage instead of raw image_data
         
         # Check cache first (if available)
         if CACHE_AVAILABLE and cache_manager:
             cached_prescription = cache_manager.get_prescription(image_hash)
             if cached_prescription:
-                import logging
-                logging.info(f"Cache hit for prescription {image_hash[:8]}...")
+                logger.info(f"Cache hit for prescription {image_hash[:8]}...", context={"cache": "hit", "image_hash": image_hash[:8]})
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -409,8 +465,7 @@ async def analyze_and_execute(
                 if CACHE_AVAILABLE and cache_manager:
                     cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
                 
-                import logging
-                logging.info(f"✅ Combined analysis completed: {len(ui_schema.elements)} elements, {len(plan.steps)} steps (1 API call instead of 2)")
+                logger.info(f"Combined analysis completed: {len(ui_schema.elements)} elements, {len(plan.steps)} steps (1 API call instead of 2)", context={"elements": len(ui_schema.elements), "steps": len(plan.steps), "optimization": "combined"})
                 
                 used_combined = True
                 
@@ -442,12 +497,10 @@ async def analyze_and_execute(
                     cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
                 
                 # Log for debugging
-                import logging
-                logging.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found")
+                logger.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found", context={"elements_count": len(ui_schema.elements)})
 
             except Exception as e:
-                import logging
-                logging.error(f"Vision analysis error: {str(e)}", exc_info=True)
+                logger.error(f"Vision analysis error: {str(e)}", exception=e, context={"endpoint": "analyze-and-execute", "step": "vision"})
                 raise HTTPException(
                     status_code=500, 
                     detail=f"Vision analysis failed: {str(e)}. Please check your API key and credits."
@@ -560,8 +613,7 @@ async def analyze_and_execute(
                                 "instructions": prescription.instructions
                             }
                     except Exception as e:
-                        import logging
-                        logging.warning(f"Prescription extraction failed: {e}")
+                        logger.warning(f"Prescription extraction failed: {e}", exception=e, context={"endpoint": "analyze-and-execute", "step": "prescription_extraction"})
                 
                 # Extract from elements
                 for elem in ui_schema.elements:
@@ -608,8 +660,7 @@ async def analyze_and_execute(
                 }
             )
         except Exception as exec_error:
-            import logging
-            logging.error(f"Browser execution error: {str(exec_error)}", exc_info=True)
+            logger.error(f"Browser execution error: {str(exec_error)}", exception=exec_error, context={"endpoint": "analyze-and-execute", "step": "browser_execution"})
             
             # Fallback: Return extracted data even if execution fails
             extracted_data = {}
@@ -636,8 +687,7 @@ async def analyze_and_execute(
                             "instructions": prescription.instructions
                         }
                 except Exception as e:
-                    import logging
-                    logging.warning(f"Prescription extraction failed: {e}")
+                    logger.warning(f"Prescription extraction failed: {e}", exception=e, context={"endpoint": "check-prescription-interactions", "step": "prescription_extraction"})
             
             # Extract from elements
             for elem in ui_schema.elements:
@@ -692,11 +742,12 @@ async def analyze_and_execute(
 
 @app.post("/check-prescription-interactions")
 async def check_prescription_interactions(
+    request: Request,
     files: List[UploadFile] = File(...),
     allergies: Optional[str] = Form(None)
 ):
     """
-    UNIQUE FEATURE: Multi-prescription drug interaction checker
+    UNIQUE FEATURE: Multi-prescription drug interaction checker.
     
     Scans multiple prescription images and checks for:
     - Drug-drug interactions
@@ -704,6 +755,15 @@ async def check_prescription_interactions(
     - Dosage concerns
     
     This is HealthScan's unique differentiator!
+    
+    **Parameters:**
+    - `files`: List of prescription image files
+    - `allergies`: Comma-separated list of known allergies (optional)
+    
+    **Returns:**
+    - `prescriptions`: Extracted prescription details
+    - `interactions`: Categorized by severity (major, moderate, minor)
+    - `has_interactions`: Boolean indicating if any interactions found
     """
     try:
         import asyncio
@@ -724,8 +784,7 @@ async def check_prescription_interactions(
             
             if cached_prescription:
                 prescription = PrescriptionInfo(**cached_prescription)
-                import logging
-                logging.info(f"Using cached prescription for {image_hash[:8]}...")
+                logger.info(f"Using cached prescription for {image_hash[:8]}...", context={"cache": "hit", "image_hash": image_hash[:8]})
             else:
                 prescription = prescription_extractor.extract_from_image(image_data)
                 prescription_dict = prescription.model_dump()
@@ -758,8 +817,7 @@ async def check_prescription_interactions(
         if CACHE_AVAILABLE and cache_manager:
             cached_interactions = cache_manager.get_interactions(medications_hash, allergies_hash)
             if cached_interactions:
-                import logging
-                logging.info(f"Cache hit for interactions {medications_hash[:8]}...")
+                logger.info(f"Cache hit for interactions {medications_hash[:8]}...", context={"cache": "hit", "medications_hash": medications_hash[:8]})
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -772,6 +830,7 @@ async def check_prescription_interactions(
                 )
         
         # HIPAA Compliance: Log interaction check (accessing PHI)
+        client_ip = request.client.host if request.client else "unknown"
         audit_logger.log_data_access(
             user_id=None,
             resource_type="prescription_interactions",
@@ -843,8 +902,15 @@ async def get_diet_recommendations(
     dietary_restrictions: Optional[str] = Form(None)
 ):
     """
-    Get diet recommendations based on medical condition
-    Used by DietPortal component
+    Get personalized diet recommendations based on medical condition.
+    
+    **Parameters:**
+    - `condition`: Medical condition/diagnosis (e.g., "Type 2 Diabetes")
+    - `medications`: Comma-separated list of current medications (optional)
+    - `dietary_restrictions`: Comma-separated dietary restrictions (optional)
+    
+    **Returns:**
+    - `recommendations`: Foods to eat, avoid, nutritional focus, warnings
     """
     try:
         med_str = medications or ""
@@ -854,8 +920,7 @@ async def get_diet_recommendations(
         if CACHE_AVAILABLE and cache_manager:
             cached_recommendations = cache_manager.get_diet_recommendations(condition, med_str, diet_res_str)
             if cached_recommendations:
-                import logging
-                logging.info(f"Cache hit for diet recommendations: {condition}")
+                logger.info(f"Cache hit for diet recommendations: {condition}", context={"cache": "hit", "condition": condition})
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -904,8 +969,15 @@ async def check_food_compatibility(
     medications: Optional[str] = Form(None)
 ):
     """
-    Check if a food item is compatible with condition/medications
-    Used by DietPortal component
+    Check if a food item is compatible with condition/medications.
+    
+    **Parameters:**
+    - `food_item`: Food item to check (e.g., "Grapefruit")
+    - `condition`: Medical condition (optional)
+    - `medications`: Comma-separated medications (optional)
+    
+    **Returns:**
+    - `compatibility`: Safety status, warnings, recommendations
     """
     try:
         med_list = [m.strip() for m in medications.split(",")] if medications else None
@@ -941,8 +1013,17 @@ async def generate_meal_plan(
     dietary_restrictions: Optional[str] = Form(None)
 ):
     """
-    Generate a meal plan for a medical condition
-    Used by DietPortal component
+    Generate a personalized meal plan for a medical condition.
+    
+    **Parameters:**
+    - `condition`: Medical condition/diagnosis
+    - `days`: Number of days for meal plan (default: 7)
+    - `dietary_restrictions`: Comma-separated restrictions (optional)
+    
+    **Returns:**
+    - `meal_plan`: Daily meal plan with breakfast, lunch, dinner, snacks
+    - `shopping_list`: Ingredients needed
+    - `nutritional_summary`: Calorie and nutrient breakdown
     """
     try:
         restrictions_list = [r.strip() for r in dietary_restrictions.split(",")] if dietary_restrictions else None

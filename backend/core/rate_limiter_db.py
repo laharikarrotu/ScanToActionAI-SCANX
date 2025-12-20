@@ -46,7 +46,8 @@ class DatabaseRateLimiter:
                 """))
                 conn.commit()
         except Exception as e:
-            print(f"Rate limit table creation error (may already exist): {e}")
+            import logging
+            logging.debug(f"Rate limit table creation error (may already exist): {e}")
     
     def is_allowed(
         self,
@@ -110,7 +111,8 @@ class DatabaseRateLimiter:
                 return True, remaining
                 
         except Exception as e:
-            print(f"Database rate limiter error: {e}")
+            import logging
+            logging.error(f"Database rate limiter error: {e}", exc_info=True)
             # Fail open - allow request if database fails
             return True, max_requests
     
@@ -124,5 +126,6 @@ class DatabaseRateLimiter:
                 )
                 conn.commit()
         except Exception as e:
-            print(f"Rate limiter reset error: {e}")
+            import logging
+            logging.error(f"Rate limiter reset error: {e}", exc_info=True)
 

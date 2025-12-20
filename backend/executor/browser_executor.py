@@ -70,6 +70,7 @@ class BrowserExecutor:
                 if self.playwright:
                     self.playwright = None
             except:
+                # Element not found, continue to next step
                 pass
         except Exception as e:
             # Log but don't raise - cleanup should be best effort

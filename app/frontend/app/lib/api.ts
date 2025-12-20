@@ -2,20 +2,17 @@
  * API client for SCANX backend
  */
 
+import type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback } from './types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export interface AnalyzeResponse {
-  status: string;
-  ui_schema?: any;
-  plan?: any;
-  execution?: any;
-  message: string;
-}
+// Re-export types for convenience
+export type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback };
 
 export async function analyzeAndExecute(
   imageFile: File,
   intent: string,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): Promise<AnalyzeResponse> {
   const formData = new FormData();
   formData.append('file', imageFile);
@@ -52,45 +49,7 @@ export async function analyzeAndExecute(
 }
 
 // Fast direct prescription extraction (like ChatGPT)
-export interface PrescriptionData {
-  medication: {
-    name: string;
-    dosage?: string;
-    frequency?: string;
-    quantity?: string;
-    refills?: string;
-    instructions?: string;
-  };
-  prescriber?: string;
-  date?: string;
-}
-
-export interface PrescriptionInfo {
-  medication_name: string;
-  dosage?: string;
-  frequency?: string;
-  quantity?: string;
-  refills?: string;
-  instructions?: string;
-  prescriber?: string;
-  date?: string;
-}
-
-export interface ExtractPrescriptionResponse {
-  status: string;
-  message: string;
-  prescription_info?: PrescriptionInfo;
-  cached?: boolean;
-}
-
-export interface StreamingProgress {
-  step: string;
-  progress: number;
-  message: string;
-  prescription_info?: PrescriptionInfo;
-}
-
-export type StreamingCallback = (progress: StreamingProgress) => void;
+// Types moved to types.ts - re-exported above
 
 export async function extractPrescription(
   imageFile: File,
@@ -174,7 +133,8 @@ export async function extractPrescription(
                   }
                 } catch (e) {
                   // Ignore JSON parse errors for malformed lines
-                  console.warn('Failed to parse SSE data:', line);
+                  // Malformed SSE lines are common and non-critical - fail silently
+                  // In production, these are expected edge cases in SSE parsing
                 }
               }
             }

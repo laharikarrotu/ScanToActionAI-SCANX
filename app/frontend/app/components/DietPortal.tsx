@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { DietRecommendation, FoodCompatibility, MealPlan, MealPlanDay } from '../lib/types';
 import ProgressTracker from './ProgressTracker';
 import { useHealthScan } from '../context/HealthScanContext';
 
@@ -20,7 +21,11 @@ export default function DietPortal() {
   const [medications, setMedications] = useState(dietData?.medications || '');
   const [dietaryRestrictions, setDietaryRestrictions] = useState(dietData?.dietary_restrictions || '');
   const [loading, setLoading] = useState(false);
-  const [recommendations, setRecommendations] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<DietRecommendation | null>(null);
+  const [foodCheckResult, setFoodCheckResult] = useState<FoodCompatibility | null>(null);
+  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
+  const [mealPlanDays, setMealPlanDays] = useState(7);
+  const [foodItem, setFoodItem] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'recommendations' | 'food-check' | 'meal-plan'>('recommendations');
   
@@ -87,22 +92,19 @@ export default function DietPortal() {
       const data = await response.json();
       setRecommendations(data.recommendations);
       clearErrors();
-    } catch (err: any) {
-      const errorMsg = err.message || 'Something went wrong';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Something went wrong';
       setLocalError(errorMsg);
       setError('diet', errorMsg);
       
       // Error recovery
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
         setError('diet', 'Network error. Please check your connection and try again.');
       }
     } finally {
       setLoading(false);
     }
   };
-
-  const [foodItem, setFoodItem] = useState('');
-  const [foodCheckResult, setFoodCheckResult] = useState<any>(null);
 
   const handleCheckFood = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,17 +137,14 @@ export default function DietPortal() {
       const data = await response.json();
       setFoodCheckResult(data.compatibility);
       clearErrors();
-    } catch (err: any) {
-      const errorMsg = err.message || 'Something went wrong';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Something went wrong';
       setLocalError(errorMsg);
       setError('diet', errorMsg);
     } finally {
       setLoading(false);
     }
   };
-
-  const [mealPlanDays, setMealPlanDays] = useState(7);
-  const [mealPlan, setMealPlan] = useState<any>(null);
 
   const handleGenerateMealPlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,8 +177,8 @@ export default function DietPortal() {
       const data = await response.json();
       setMealPlan(data.meal_plan);
       clearErrors();
-    } catch (err: any) {
-      const errorMsg = err.message || 'Something went wrong';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Something went wrong';
       setLocalError(errorMsg);
       setError('diet', errorMsg);
     } finally {
@@ -456,7 +455,7 @@ export default function DietPortal() {
               <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 space-y-4">
                 <h2 className="text-xl font-semibold">{mealPlanDays}-Day Meal Plan for {condition}</h2>
                 
-                {mealPlan.meal_plan && mealPlan.meal_plan.map((day: any, idx: number) => (
+                {mealPlan.meal_plan && mealPlan.meal_plan.map((day: MealPlanDay, idx: number) => (
                   <div key={idx} className="bg-zinc-900 rounded-lg p-4 border border-zinc-700">
                     <h3 className="font-semibold mb-2">Day {day.day}</h3>
                     <div className="space-y-2 text-sm">

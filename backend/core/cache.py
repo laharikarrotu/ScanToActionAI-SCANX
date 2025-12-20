@@ -44,7 +44,8 @@ class CacheManager:
             # Test connection
             self.client.ping()
         except Exception as e:
-            print(f"Redis connection failed: {e}. Falling back to in-memory cache.")
+            import logging
+            logging.warning(f"Redis connection failed: {e}. Falling back to in-memory cache.")
             self.client = None
             self._memory_cache = {}
     
@@ -62,7 +63,8 @@ class CacheManager:
             if data:
                 return pickle.loads(data)
         except Exception as e:
-            print(f"Cache get error: {e}")
+            import logging
+            logging.error(f"Cache get error: {e}", exc_info=True)
         return None
     
     def set(self, key: str, value: Any, ttl: int = 3600):
@@ -75,7 +77,8 @@ class CacheManager:
             data = pickle.dumps(value)
             self.client.setex(key, ttl, data)
         except Exception as e:
-            print(f"Cache set error: {e}")
+            import logging
+            logging.error(f"Cache set error: {e}", exc_info=True)
     
     def delete(self, key: str):
         """Delete key from cache"""
@@ -86,7 +89,8 @@ class CacheManager:
         try:
             self.client.delete(key)
         except Exception as e:
-            print(f"Cache delete error: {e}")
+            import logging
+            logging.error(f"Cache delete error: {e}", exc_info=True)
     
     def get_image_result(self, image_hash: str) -> Optional[dict]:
         """Get cached vision analysis result for an image"""
@@ -133,7 +137,8 @@ class CacheManager:
             if keys:
                 self.client.delete(*keys)
         except Exception as e:
-            print(f"Cache invalidation error: {e}")
+            import logging
+            logging.error(f"Cache invalidation error: {e}", exc_info=True)
     
     def get_prescription(self, image_hash: str) -> Optional[dict]:
         """Get cached prescription extraction result"""

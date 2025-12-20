@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { analyzeAndExecute } from '../lib/api';
+import type { InteractionCheckResponse, InteractionWarning, PrescriptionDetail } from '../lib/types';
 import ProgressTracker from './ProgressTracker';
 import { useHealthScan } from '../context/HealthScanContext';
 
@@ -22,7 +22,7 @@ export default function InteractionChecker() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [allergies, setAllergies] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<InteractionCheckResponse | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -100,12 +100,12 @@ export default function InteractionChecker() {
       });
       
       clearErrors();
-    } catch (err: any) {
-      const errorMsg = err.message || 'Something went wrong';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Something went wrong';
       setLocalError(errorMsg);
       
       // Error recovery: Retry suggestion
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
         setError('interactions', 'Network error. Please check your connection and try again.');
       } else {
         setError('interactions', errorMsg);
@@ -249,7 +249,7 @@ export default function InteractionChecker() {
                   {result.interactions.major.length > 0 && (
                     <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
                       <h3 className="text-red-400 font-semibold mb-2">⚠️ Major Interactions ({result.interactions.major.length})</h3>
-                      {result.interactions.major.map((interaction: any, idx: number) => (
+                      {result.interactions.major.map((interaction: InteractionWarning, idx: number) => (
                         <div key={idx} className="mb-3 p-3 bg-red-900/20 rounded">
                           <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
                           <p className="text-sm mt-1">{interaction.description}</p>
@@ -262,7 +262,7 @@ export default function InteractionChecker() {
                   {result.interactions.moderate.length > 0 && (
                     <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
                       <h3 className="text-yellow-400 font-semibold mb-2">⚡ Moderate Interactions ({result.interactions.moderate.length})</h3>
-                      {result.interactions.moderate.map((interaction: any, idx: number) => (
+                      {result.interactions.moderate.map((interaction: InteractionWarning, idx: number) => (
                         <div key={idx} className="mb-3 p-3 bg-yellow-900/20 rounded">
                           <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
                           <p className="text-sm mt-1">{interaction.description}</p>
@@ -275,7 +275,7 @@ export default function InteractionChecker() {
                   {result.interactions.minor.length > 0 && (
                     <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
                       <h3 className="text-blue-400 font-semibold mb-2">ℹ️ Minor Interactions ({result.interactions.minor.length})</h3>
-                      {result.interactions.minor.map((interaction: any, idx: number) => (
+                      {result.interactions.minor.map((interaction: InteractionWarning, idx: number) => (
                         <div key={idx} className="mb-3 p-3 bg-blue-900/20 rounded">
                           <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
                           <p className="text-sm mt-1">{interaction.description}</p>
@@ -302,7 +302,7 @@ export default function InteractionChecker() {
                   <button
                     onClick={() => {
                       // Extract medication names from result
-                      const medNames = result.prescription_details?.map((p: any) => p.medication_name).filter(Boolean).join(', ') || '';
+                      const medNames = result.prescription_details?.map((p: PrescriptionDetail) => p.medication_name).filter(Boolean).join(', ') || '';
                       if (medNames) {
                         localStorage.setItem('current_medications', medNames);
                       }

@@ -11,6 +11,8 @@ from .resource_manager import ResourceManager, setup_graceful_shutdown
 from .encryption import ImageEncryption
 from .audit_logger import AuditLogger, AuditAction
 from .streaming import StreamingResponseBuilder
+from .logger import StructuredLogger, get_logger, LogLevel
+from .middleware import RequestLoggingMiddleware, PerformanceMiddleware
 
 __all__ = [
     "CacheManager",
@@ -31,6 +33,11 @@ __all__ = [
     "ImageEncryption",
     "AuditLogger",
     "AuditAction",
-    "StreamingResponseBuilder"
+    "StreamingResponseBuilder",
+    "StructuredLogger",
+    "get_logger",
+    "LogLevel",
+    "RequestLoggingMiddleware",
+    "PerformanceMiddleware"
 ]
 
