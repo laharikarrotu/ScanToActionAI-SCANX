@@ -13,16 +13,29 @@ class DatabaseSettings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields in .env
 
 db_settings = DatabaseSettings()
 
-# Create engine
+# Create engine with connection pooling for scalability
 if db_settings.database_url.startswith("postgresql"):
-    # Postgres/Supabase
-    engine = create_engine(db_settings.database_url, pool_pre_ping=True)
+    # Postgres/Supabase with connection pooling
+    engine = create_engine(
+        db_settings.database_url,
+        pool_pre_ping=True,  # Verify connections before using
+        pool_size=10,  # Number of connections to maintain
+        max_overflow=20,  # Additional connections beyond pool_size
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        pool_timeout=30,  # Timeout for getting connection from pool
+        echo=False  # Set to True for SQL query logging
+    )
 else:
-    # SQLite fallback
-    engine = create_engine(db_settings.database_url, connect_args={"check_same_thread": False})
+    # SQLite fallback (not recommended for production)
+    engine = create_engine(
+        db_settings.database_url,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

@@ -3,8 +3,23 @@ Diet Advisor - Provides diet recommendations based on medical conditions
 """
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from openai import OpenAI
 import os
+import json
+
+# Try Gemini first, fallback to OpenAI
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    genai = None
+
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
 
 class DietRecommendation(BaseModel):
     condition: str
@@ -26,9 +41,22 @@ class DietAdvisor:
     Provides personalized diet recommendations based on medical conditions
     """
     
-    def __init__(self, api_key: Optional[str] = None):
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        self.model = "gpt-4o"
+    def __init__(self, api_key: Optional[str] = None, use_gemini: bool = True):
+        self.use_gemini = use_gemini and GEMINI_AVAILABLE
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.openai_api_key = api_key or os.getenv("OPENAI_API_KEY")
+        
+        if self.use_gemini and self.gemini_api_key:
+            genai.configure(api_key=self.gemini_api_key)
+            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.client = None
+        elif OPENAI_AVAILABLE and self.openai_api_key:
+            self.client = OpenAI(api_key=self.openai_api_key)
+            self.model_name = "gpt-4o"
+            self.model = None
+        else:
+            self.client = None
+            self.model = None
         
         # Common medication-food interactions
         self.medication_food_interactions = {
@@ -88,19 +116,42 @@ Be specific and practical. Focus on evidence-based recommendations."""
             prompt += f"\n\nDietary restrictions: {', '.join(dietary_restrictions)}"
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a medical nutritionist. Provide evidence-based dietary advice."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3
-            )
-            
-            result_text = response.choices[0].message.content
-            import json
-            result_dict = json.loads(result_text)
+            if self.use_gemini and self.model:
+                # Use Gemini
+                full_prompt = f"""You are a medical nutritionist. Provide evidence-based dietary advice.
+
+{prompt}
+
+Return ONLY valid JSON, no other text."""
+                response = self.model.generate_content(
+                    full_prompt,
+                    generation_config={
+                        "temperature": 0.3,
+                        "max_output_tokens": 2000,
+                    }
+                )
+                result_text = response.text
+                # Try to extract JSON if wrapped in markdown
+                import re
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_text, re.DOTALL)
+                if json_match:
+                    result_text = json_match.group(1)
+                result_dict = json.loads(result_text)
+            elif self.client:
+                # Use OpenAI
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a medical nutritionist. Provide evidence-based dietary advice."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3
+                )
+                result_text = response.choices[0].message.content
+                result_dict = json.loads(result_text)
+            else:
+                raise ValueError("No API client available")
             
             # Check for medication-food interactions
             warnings = result_dict.get("warnings", [])
@@ -226,19 +277,42 @@ Return JSON:
             prompt += f"\n\nDietary restrictions: {', '.join(dietary_restrictions)}"
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a registered dietitian creating personalized meal plans."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.4
-            )
-            
-            result_text = response.choices[0].message.content
-            import json
-            return json.loads(result_text)
+            if self.use_gemini and self.model:
+                # Use Gemini
+                full_prompt = f"""You are a registered dietitian creating personalized meal plans.
+
+{prompt}
+
+Return ONLY valid JSON, no other text."""
+                response = self.model.generate_content(
+                    full_prompt,
+                    generation_config={
+                        "temperature": 0.4,
+                        "max_output_tokens": 4000,
+                    }
+                )
+                result_text = response.text
+                # Try to extract JSON if wrapped in markdown
+                import re
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_text, re.DOTALL)
+                if json_match:
+                    result_text = json_match.group(1)
+                return json.loads(result_text)
+            elif self.client:
+                # Use OpenAI
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a registered dietitian creating personalized meal plans."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.4
+                )
+                result_text = response.choices[0].message.content
+                return json.loads(result_text)
+            else:
+                raise ValueError("No API client available")
             
         except Exception as e:
             return {

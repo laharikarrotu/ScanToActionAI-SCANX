@@ -30,30 +30,26 @@ export async function analyzeAndExecute(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to analyze and execute');
+    let errorMessage = 'Failed to analyze and execute';
+    try {
+      const error = await response.json();
+      errorMessage = error.detail || error.message || errorMessage;
+    } catch (e) {
+      // If response is not JSON, use status text
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // Check if result has error status
+  if (result.status === 'error') {
+    throw new Error(result.message || 'An error occurred while processing');
+  }
+  
+  return result;
 }
 
-export async function analyzeOnly(imageFile: File, hint?: string): Promise<any> {
-  const formData = new FormData();
-  formData.append('file', imageFile);
-  if (hint) {
-    formData.append('hint', hint);
-  }
-
-  const response = await fetch(`${API_BASE_URL}/analyze`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to analyze');
-  }
-
-  return response.json();
-}
+// Removed analyzeOnly - not used anywhere in the codebase
 

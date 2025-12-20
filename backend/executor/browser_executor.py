@@ -28,22 +28,30 @@ class BrowserExecutor:
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
+        self.playwright = None  # Store playwright instance
     
     async def initialize(self):
         """Initialize browser session"""
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch(headless=self.headless)
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=self.headless)
         self.context = await self.browser.new_context()
         self.page = await self.context.new_page()
     
     async def close(self):
         """Close browser session"""
-        if self.page:
-            await self.page.close()
-        if self.context:
-            await self.context.close()
-        if self.browser:
-            await self.browser.close()
+        try:
+            if self.page:
+                await self.page.close()
+            if self.context:
+                await self.context.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception as e:
+            # Log but don't raise - cleanup should be best effort
+            import logging
+            logging.warning(f"Error closing browser executor: {e}")
     
     async def _find_element_selector(self, element_id: str, ui_schema: Dict[str, Any], page: Page) -> Optional[str]:
         """

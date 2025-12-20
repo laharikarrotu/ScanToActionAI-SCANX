@@ -42,7 +42,7 @@ export default function InteractionChecker() {
 
     try {
       const formData = new FormData();
-      // FastAPI accepts List[UploadFile] - append all files with same key
+      // FastAPI accepts List[UploadFile] - append all files with key 'files'
       images.forEach((file) => {
         formData.append('files', file);
       });

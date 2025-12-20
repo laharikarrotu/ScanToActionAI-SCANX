@@ -154,23 +154,91 @@ export default function ScanScreen() {
       {/* Results */}
       {result && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Results</Text>
+          <View style={styles.resultHeader}>
+            <Text style={styles.sectionTitle}>Results</Text>
+            <View style={[
+              styles.statusBadge,
+              result.status === 'success' && styles.statusSuccess,
+              result.status === 'error' && styles.statusError,
+              result.status === 'partial' && styles.statusPartial,
+            ]}>
+              <Text style={styles.statusText}>
+                {result.status === 'success' && '✓ Success'}
+                {result.status === 'error' && '✗ Error'}
+                {result.status === 'partial' && '⚠ Partial'}
+                {!['success', 'error', 'partial'].includes(result.status) && result.status}
+              </Text>
+            </View>
+          </View>
+          
           <View style={styles.resultContainer}>
-            <Text style={styles.resultStatus}>Status: {result.status}</Text>
-            {result.plan && (
-              <View style={styles.resultSection}>
-                <Text style={styles.resultLabel}>Plan:</Text>
-                <Text style={styles.resultText}>{JSON.stringify(result.plan, null, 2)}</Text>
+            {result.message && (
+              <View style={styles.messageBox}>
+                <Text style={styles.messageText}>{result.message}</Text>
               </View>
             )}
-            {result.execution && (
+            
+            {result.plan && result.plan.steps && (
               <View style={styles.resultSection}>
-                <Text style={styles.resultLabel}>Execution:</Text>
-                <Text style={styles.resultText}>{JSON.stringify(result.execution, null, 2)}</Text>
+                <Text style={styles.resultLabel}>Action Plan:</Text>
+                <ScrollView style={styles.planScroll}>
+                  {result.plan.steps.map((step: any, idx: number) => (
+                    <View key={idx} style={styles.planStep}>
+                      <Text style={styles.stepNumber}>{step.step || idx + 1}.</Text>
+                      <View style={styles.stepContent}>
+                        <Text style={styles.stepAction}>
+                          <Text style={styles.stepActionBold}>{step.action || 'Action'}</Text>
+                          {step.target && <Text style={styles.stepTarget}> on {step.target}</Text>}
+                        </Text>
+                        {step.value && (
+                          <Text style={styles.stepValue}>{step.value}</Text>
+                        )}
+                        {step.description && (
+                          <Text style={styles.stepDescription}>{step.description}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             )}
+            
+            {result.execution && result.execution.logs && (
+              <View style={styles.resultSection}>
+                <Text style={styles.resultLabel}>Execution Log:</Text>
+                <ScrollView style={styles.logScroll}>
+                  {result.execution.logs.map((log: string, idx: number) => (
+                    <Text key={idx} style={styles.logText}>
+                      {log}
+                    </Text>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
+            {result.ui_schema && result.ui_schema.elements && (
+              <View style={styles.resultSection}>
+                <Text style={styles.resultLabel}>
+                  Detected Elements ({result.ui_schema.elements.length}):
+                </Text>
+                <ScrollView style={styles.elementsScroll}>
+                  {result.ui_schema.elements.slice(0, 10).map((elem: any, idx: number) => (
+                    <View key={idx} style={styles.elementItem}>
+                      <Text style={styles.elementType}>{elem.type}</Text>
+                      {elem.label && <Text style={styles.elementLabel}> - {elem.label}</Text>}
+                    </View>
+                  ))}
+                  {result.ui_schema.elements.length > 10 && (
+                    <Text style={styles.moreText}>
+                      ... and {result.ui_schema.elements.length - 10} more
+                    </Text>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+            
             <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-              <Text style={styles.resetButtonText}>Start over</Text>
+              <Text style={styles.resetButtonText}>Start Over</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -290,14 +358,47 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff6666',
   },
-  resultContainer: {
-    marginTop: 12,
+  resultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  resultStatus: {
-    color: '#0066CC',
-    fontSize: 16,
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#333',
+  },
+  statusSuccess: {
+    backgroundColor: '#0a4d0a',
+  },
+  statusError: {
+    backgroundColor: '#4a0000',
+  },
+  statusPartial: {
+    backgroundColor: '#4a4a00',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 12,
+  },
+  resultContainer: {
+    marginTop: 0,
+  },
+  messageBox: {
+    backgroundColor: '#0a0a0a',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0066CC',
+  },
+  messageText: {
+    color: '#00ccff',
+    fontSize: 14,
+    lineHeight: 20,
   },
   resultSection: {
     marginBottom: 16,
@@ -305,23 +406,101 @@ const styles = StyleSheet.create({
   resultLabel: {
     color: '#999',
     fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  planScroll: {
+    maxHeight: 200,
+  },
+  planStep: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 8,
+  },
+  stepNumber: {
+    color: '#0066CC',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
+    minWidth: 24,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepAction: {
+    color: '#fff',
+    fontSize: 14,
     marginBottom: 4,
   },
-  resultText: {
-    color: '#fff',
+  stepActionBold: {
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  stepTarget: {
+    color: '#999',
+  },
+  stepValue: {
+    color: '#00ccff',
     fontSize: 12,
-    fontFamily: 'monospace',
+    marginTop: 2,
+  },
+  stepDescription: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  logScroll: {
+    maxHeight: 150,
     backgroundColor: '#0a0a0a',
     padding: 12,
+    borderRadius: 8,
+  },
+  logText: {
+    color: '#999',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  elementsScroll: {
+    maxHeight: 150,
+  },
+  elementItem: {
+    flexDirection: 'row',
+    padding: 8,
+    backgroundColor: '#0a0a0a',
     borderRadius: 4,
+    marginBottom: 4,
+  },
+  elementType: {
+    color: '#0066CC',
+    fontSize: 12,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
+  elementLabel: {
+    color: '#999',
+    fontSize: 12,
+  },
+  moreText: {
+    color: '#666',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   resetButton: {
-    marginTop: 12,
-    padding: 8,
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    alignItems: 'center',
   },
   resetButtonText: {
-    color: '#999',
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

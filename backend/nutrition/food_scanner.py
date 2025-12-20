@@ -3,9 +3,29 @@ Food Scanner - Extracts nutritional information from food labels
 """
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
-from openai import OpenAI
 import base64
 import os
+import json
+import re
+
+# Try Gemini first, fallback to OpenAI
+try:
+    import google.generativeai as genai
+    from PIL import Image
+    import io
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    genai = None
+    Image = None
+    io = None
+
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
 
 class NutritionFacts(BaseModel):
     serving_size: Optional[str] = None
@@ -27,9 +47,22 @@ class FoodScanner:
     Extracts nutritional information from food label images
     """
     
-    def __init__(self, api_key: Optional[str] = None):
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
-        self.model = "gpt-4o"
+    def __init__(self, api_key: Optional[str] = None, use_gemini: bool = True):
+        self.use_gemini = use_gemini and GEMINI_AVAILABLE
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.openai_api_key = api_key or os.getenv("OPENAI_API_KEY")
+        
+        if self.use_gemini and self.gemini_api_key:
+            genai.configure(api_key=self.gemini_api_key)
+            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.client = None
+        elif OPENAI_AVAILABLE and self.openai_api_key:
+            self.client = OpenAI(api_key=self.openai_api_key)
+            self.model_name = "gpt-4o"
+            self.model = None
+        else:
+            self.client = None
+            self.model = None
     
     def extract_nutrition_facts(self, image_data: bytes) -> NutritionFacts:
         """
@@ -62,29 +95,50 @@ Return a JSON object with this structure:
 Extract all visible nutrition information. If a value is not visible, set it to null."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}"
-                                }
-                            }
-                        ]
+            if self.use_gemini and self.model:
+                # Use Gemini
+                image = Image.open(io.BytesIO(image_data))
+                full_prompt = f"""{prompt}
+
+Return ONLY valid JSON, no other text."""
+                response = self.model.generate_content(
+                    [full_prompt, image],
+                    generation_config={
+                        "temperature": 0.1,
+                        "max_output_tokens": 2000,
                     }
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
-            result_text = response.choices[0].message.content
-            import json
-            result_dict = json.loads(result_text)
+                )
+                result_text = response.text
+                # Try to extract JSON if wrapped in markdown
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_text, re.DOTALL)
+                if json_match:
+                    result_text = json_match.group(1)
+                result_dict = json.loads(result_text)
+            elif self.client:
+                # Use OpenAI
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_base64}"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.1
+                )
+                result_text = response.choices[0].message.content
+                result_dict = json.loads(result_text)
+            else:
+                raise ValueError("No API client available")
             
             # Handle vitamins separately
             vitamins = result_dict.pop("vitamins", None)

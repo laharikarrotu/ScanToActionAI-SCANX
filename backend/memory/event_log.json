@@ -1,0 +1,643 @@
+[
+  {
+    "timestamp": "2025-12-18T16:01:22.303092",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-18T16:01:26.943887",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "error",
+      "url_hint": null,
+      "elements": []
+    }
+  },
+  {
+    "timestamp": "2025-12-19T04:15:47.255562",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T04:16:00.006853",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": []
+    }
+  },
+  {
+    "timestamp": "2025-12-19T04:22:57.427621",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T15:51:25.976103",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand the situation"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T15:53:48.098889",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T15:53:58.387851",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_fallback_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_10",
+          "type": "text",
+          "label": "Olopatadine 0.6\" EI2yre:2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_11",
+          "type": "text",
+          "label": "generic ostil bid 50.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_12",
+          "type": "text",
+          "label": "Patanase (Novartis) 6-11 yte:] spray per 304.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_13",
+          "type": "text",
+          "label": "nostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_14",
+          "type": "text",
+          "label": "\u2018TRapratnate WD Tor 90 days",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-19T15:54:01.735980",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "error",
+      "steps": [],
+      "estimated_time": 0
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:10:54.692359",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand the prescription \r\n"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:11:04.572692",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_fallback_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_10",
+          "type": "text",
+          "label": "Olopatadine 0.6\" EI2yre:2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_11",
+          "type": "text",
+          "label": "generic ostil bid 50.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_12",
+          "type": "text",
+          "label": "Patanase (Novartis) 6-11 yte:] spray per 304.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_13",
+          "type": "text",
+          "label": "nostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_14",
+          "type": "text",
+          "label": "\u2018TRapratnate WD Tor 90 days",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:11:07.661413",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "error",
+      "steps": [],
+      "estimated_time": 0
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:12:54.597391",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand the prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:13:03.997454",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_fallback_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_10",
+          "type": "text",
+          "label": "Olopatadine 0.6\" EI2yre:2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_11",
+          "type": "text",
+          "label": "generic ostil bid 50.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_12",
+          "type": "text",
+          "label": "Patanase (Novartis) 6-11 yte:] spray per 304.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_13",
+          "type": "text",
+          "label": "nostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_fallback_14",
+          "type": "text",
+          "label": "\u2018TRapratnate WD Tor 90 days",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:13:07.077695",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "error",
+      "steps": [],
+      "estimated_time": 0
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:59:40.764621",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription \r\n"
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:59:41.689375",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:59:41.763155",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process other (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        },
+        {
+          "step": 6,
+          "action": "read",
+          "target": "ocr_text_5",
+          "value": null,
+          "description": "Read: pernostil bid"
+        },
+        {
+          "step": 7,
+          "action": "read",
+          "target": "ocr_text_6",
+          "value": null,
+          "description": "Read: Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict"
+        },
+        {
+          "step": 8,
+          "action": "read",
+          "target": "ocr_text_7",
+          "value": null,
+          "description": "Read: nostilbid or2 sprays 30.00"
+        },
+        {
+          "step": 9,
+          "action": "read",
+          "target": "ocr_text_8",
+          "value": null,
+          "description": "Read: Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15."
+        },
+        {
+          "step": 10,
+          "action": "read",
+          "target": "ocr_text_9",
+          "value": null,
+          "description": "Read: Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00"
+        }
+      ],
+      "estimated_time": 20
+    }
+  },
+  {
+    "timestamp": "2025-12-19T16:59:43.778742",
+    "type": "error",
+    "session_id": null,
+    "data": {
+      "error": "Executable doesn't exist at /Users/laharikarrotu/Library/Caches/ms-playwright/chromium-1097/chrome-mac/Chromium.app/Contents/MacOS/Chromium\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551 Looks like Playwright was just installed or updated.       \u2551\n\u2551 Please run the following command to download new browsers: \u2551\n\u2551                                                            \u2551\n\u2551     playwright install                                     \u2551\n\u2551                                                            \u2551\n\u2551 <3 Playwright Team                                         \u2551\n\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d",
+      "endpoint": "analyze-and-execute"
+    }
+  }
+]

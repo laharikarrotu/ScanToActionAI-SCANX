@@ -103,17 +103,17 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4 pb-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">HealthScan</h1>
-          <p className="text-blue-300">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
+        <div className="mb-6 md:mb-8 text-center">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">HealthScan</h1>
+          <p className="text-sm md:text-base text-blue-300 px-2">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Image Upload Section */}
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-xl font-semibold mb-4">1. Upload or Capture Image</h2>
+          <div className="bg-zinc-800 rounded-lg p-4 md:p-6 border border-zinc-700">
+            <h2 className="text-lg md:text-xl font-semibold mb-4">1. Upload or Capture Image</h2>
             
             {imagePreview ? (
               <div className="space-y-4">
@@ -165,8 +165,8 @@ export default function ScanPage() {
           </div>
 
           {/* Intent Input */}
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-xl font-semibold mb-4">2. What do you need help with?</h2>
+          <div className="bg-zinc-800 rounded-lg p-4 md:p-6 border border-zinc-700">
+            <h2 className="text-lg md:text-xl font-semibold mb-4">2. What do you need help with?</h2>
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
@@ -316,10 +316,13 @@ export default function ScanPage() {
                 </button>
                 {result.execution?.screenshot_path && (
                   <button
-                    onClick={() => window.open(`/api/screenshot/${result.execution.screenshot_path}`, '_blank')}
+                    onClick={() => {
+                      // Screenshot is stored on backend, show path info
+                      alert(`Screenshot saved at: ${result.execution.screenshot_path}\n(Backend endpoint not implemented yet)`);
+                    }}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                   >
-                    View Screenshot
+                    View Screenshot Info
                   </button>
                 )}
               </div>

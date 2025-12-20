@@ -1,9 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic_settings import BaseSettings
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import sys
 import os
 
@@ -11,30 +10,67 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from vision.ui_detector import VisionEngine, UISchema
+from vision.image_quality import ImageQualityChecker
 from planner.agent_planner import PlannerEngine, ActionPlan
 from executor.browser_executor import BrowserExecutor, ExecutionResult
 from memory.event_log import EventLogger
+from api.config import settings
 from api.auth import create_access_token, verify_token
 from medication.prescription_extractor import PrescriptionExtractor
 from medication.interaction_checker import InteractionChecker, Medication
 from nutrition.diet_advisor import DietAdvisor
+from nutrition.condition_advisor import ConditionAdvisor
+from nutrition.food_scanner import FoodScanner
 from fastapi import Depends
 from api.rate_limiter import RateLimiter
 from fastapi import Request
 import hashlib
 
-class Settings(BaseSettings):
-    frontend_url: str = "http://localhost:3000"
-    allowed_domains: str = ""
-    openai_api_key: Optional[str] = None
-    jwt_secret: str = "change-me-in-production"
-    jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24
-    
-    class Config:
-        env_file = ".env"
+# Optional scalability modules (graceful fallback if not available)
+try:
+    from core.rate_limiter_redis import RedisRateLimiter
+    REDIS_RATE_LIMITER_AVAILABLE = True
+except ImportError:
+    REDIS_RATE_LIMITER_AVAILABLE = False
+    RedisRateLimiter = None
 
-settings = Settings()
+# Free rate limiting alternatives
+try:
+    from core.rate_limiter_db import DatabaseRateLimiter
+    DATABASE_RATE_LIMITER_AVAILABLE = True
+except ImportError:
+    DATABASE_RATE_LIMITER_AVAILABLE = False
+    DatabaseRateLimiter = None
+
+try:
+    from core.rate_limiter_token_bucket import TokenBucketRateLimiter
+    TOKEN_BUCKET_AVAILABLE = True
+except ImportError:
+    TOKEN_BUCKET_AVAILABLE = False
+    TokenBucketRateLimiter = None
+
+try:
+    from core.cache import cache_manager
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+    cache_manager = None
+
+try:
+    from core.circuit_breaker import openai_circuit_breaker
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+    # Create a simple pass-through wrapper
+    class SimpleCircuitBreaker:
+        def call(self, func, *args, **kwargs):
+            return func(*args, **kwargs)
+        async def call_async(self, func, *args, **kwargs):
+            return await func(*args, **kwargs)
+    openai_circuit_breaker = SimpleCircuitBreaker()
+
+# Remove unused imports - retry_with_backoff and task_queue not used
+# They're available in core/ but not needed in main.py
 
 # Parse allowed origins (comma-separated or single URL)
 allowed_origins = [url.strip() for url in settings.frontend_url.split(",")]
@@ -61,16 +97,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize engines
-vision_engine = VisionEngine(api_key=settings.openai_api_key)
-planner_engine = PlannerEngine(api_key=settings.openai_api_key)
+# Initialize engines - Use Gemini if available, otherwise OpenAI
+try:
+    if settings.gemini_api_key:
+        from vision.gemini_detector import GeminiVisionEngine
+        from planner.gemini_planner import GeminiPlannerEngine
+        vision_engine = GeminiVisionEngine(api_key=settings.gemini_api_key)
+        planner_engine = GeminiPlannerEngine(api_key=settings.gemini_api_key)
+        print("✅ Using Gemini Pro 1.5 for Vision and Planning")
+    else:
+        vision_engine = VisionEngine(api_key=settings.openai_api_key)
+        planner_engine = PlannerEngine(api_key=settings.openai_api_key)
+        print("✅ Using OpenAI GPT-4o for Vision and Planning")
+except Exception as e:
+    print(f"⚠️  Gemini setup failed: {e}, using OpenAI")
+    vision_engine = VisionEngine(api_key=settings.openai_api_key)
+    planner_engine = PlannerEngine(api_key=settings.openai_api_key)
 event_logger = EventLogger()
 prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
 interaction_checker = InteractionChecker()
-diet_advisor = DietAdvisor(api_key=settings.openai_api_key)
-rate_limiter = RateLimiter(max_requests=20, window_seconds=60)  # 20 requests per minute
+diet_advisor = DietAdvisor(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
+
+# Rate limiter selection (priority: Redis > Database > Token Bucket > In-Memory)
+if REDIS_RATE_LIMITER_AVAILABLE and RedisRateLimiter:
+    try:
+        rate_limiter = RedisRateLimiter()
+        print("✅ Using Redis rate limiter")
+    except Exception as e:
+        print(f"Redis rate limiter failed: {e}, trying database...")
+        rate_limiter = None
+else:
+    rate_limiter = None
+
+if not rate_limiter and DATABASE_RATE_LIMITER_AVAILABLE and DatabaseRateLimiter and settings.database_url:
+    try:
+        rate_limiter = DatabaseRateLimiter()
+        print("✅ Using Database rate limiter (free, multi-instance)")
+    except Exception as e:
+        print(f"Database rate limiter failed: {e}, trying token bucket...")
+        rate_limiter = None
+
+if not rate_limiter and TOKEN_BUCKET_AVAILABLE and TokenBucketRateLimiter:
+    try:
+        rate_limiter = TokenBucketRateLimiter()
+        print("✅ Using Token Bucket rate limiter (free, better algorithm)")
+    except Exception as e:
+        print(f"Token bucket rate limiter failed: {e}, using in-memory...")
+        rate_limiter = None
+
+if not rate_limiter:
+    rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+    print("✅ Using in-memory rate limiter (free, single instance)")
+
 condition_advisor = ConditionAdvisor()
-food_scanner = FoodScanner(api_key=settings.openai_api_key)
+food_scanner = FoodScanner(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
 
 @app.get("/")
 async def root():
@@ -139,49 +219,120 @@ async def analyze_and_execute(
         if not file.content_type or not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
+        # Check image quality (blur, resolution, brightness)
+        quality_checker = ImageQualityChecker()
+        quality_result = quality_checker.validate_image(image_data)
+        
+        if not quality_result["is_valid"]:
+            # Image is too blurry or has quality issues
+            error_message = quality_result["overall_message"]
+            raise HTTPException(
+                status_code=400, 
+                detail=error_message
+            )
+        
         image_hash = hashlib.md5(image_data).hexdigest()
+        
+        # Check cache first (if available)
+        if CACHE_AVAILABLE and cache_manager:
+            cached_result = cache_manager.get_ui_schema(image_hash, intent)
+            if cached_result:
+                import logging
+                logging.info(f"Cache hit for image {image_hash[:8]}...")
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "ui_schema": cached_result,
+                        "cached": True
+                    }
+                )
         
         # Log request
         event_logger.log_scan_request(image_hash, intent)
         
-        # Step 1: Vision - Understand UI
+        # Step 1: Vision - Understand UI (with circuit breaker protection if available)
         try:
-            ui_schema = vision_engine.analyze_image(image_data)
+            # Wrap synchronous call for circuit breaker
+            def analyze_image_sync():
+                return vision_engine.analyze_image(image_data)
+            
+            # Use circuit breaker for protection (or direct call if not available)
+            if CIRCUIT_BREAKER_AVAILABLE:
+                ui_schema = openai_circuit_breaker.call(analyze_image_sync)
+            else:
+                ui_schema = analyze_image_sync()
             ui_schema_dict = ui_schema.model_dump()
             event_logger.log_ui_schema(ui_schema_dict)
+            
+            # Cache the result (if available)
+            if CACHE_AVAILABLE and cache_manager:
+                cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
+            
+            # Log for debugging
+            import logging
+            logging.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found")
+            
         except Exception as e:
+            import logging
+            logging.error(f"Vision analysis error: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500, 
                 detail=f"Vision analysis failed: {str(e)}. Please check your OpenAI API key and credits."
             )
         
-        if not ui_schema.elements:
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "status": "no_elements",
-                    "message": "Could not detect UI elements in the image. Try a clearer image or different angle.",
-                    "ui_schema": ui_schema_dict
-                }
-            )
+        # Check if we have elements - but be more lenient
+        if not ui_schema.elements or len(ui_schema.elements) == 0:
+            # Even if no elements, return what we have (might have OCR fallback elements)
+            if ui_schema.elements:
+                # We have some elements, proceed
+                pass
+            else:
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "no_elements",
+                        "message": "Could not detect UI elements in the image. Try a clearer image or different angle.",
+                        "ui_schema": ui_schema_dict,
+                        "debug": "No elements extracted from image or OCR"
+                    }
+                )
         
         # Step 2: Planning - Create action plan
+        # Parse context safely (avoid eval() for security)
+        context_dict = None
+        if context:
+            try:
+                import json
+                context_dict = json.loads(context)
+            except json.JSONDecodeError:
+                # If not valid JSON, ignore context
+                context_dict = None
+        
         plan = planner_engine.create_plan(
             user_intent=intent,
             ui_schema=ui_schema_dict,
-            context=eval(context) if context else None
+            context=context_dict
         )
         plan_dict = plan.model_dump()
         event_logger.log_action_plan(plan_dict)
         
+        # Log plan details for debugging
+        import logging
+        logging.info(f"Action plan created: {len(plan.steps)} steps")
+        for i, step in enumerate(plan.steps):
+            logging.info(f"  Step {i+1}: {step.action} on {step.target} - {step.description}")
+        
         if not plan.steps:
+            import logging
+            logging.warning("Plan created but no steps generated. Elements available: " + str(len(ui_schema.elements)))
             return JSONResponse(
                 status_code=200,
                 content={
                     "status": "plan_only",
                     "ui_schema": ui_schema_dict,
                     "plan": plan_dict,
-                    "message": "Plan created but no steps to execute"
+                    "message": "Plan created but no steps to execute. Please try a more specific intent like 'Fill this form' or 'Extract prescription details'."
                 }
             )
         
@@ -218,36 +369,23 @@ async def analyze_and_execute(
     except Exception as e:
         error_msg = str(e)
         # Log the full error for debugging
+        import logging
+        logging.error(f"Error in analyze-and-execute: {error_msg}", exc_info=True)
         event_logger.log_event("error", {"error": error_msg, "endpoint": "analyze-and-execute"})
         
-        # Return user-friendly error
+        # Return more detailed error for debugging (in development)
+        # In production, you might want to hide some details
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": "An error occurred while processing your request. Please try again.",
+                "message": error_msg if "API key" in error_msg or "blurry" in error_msg.lower() or "quality" in error_msg.lower() else f"An error occurred: {error_msg}",
                 "error_type": type(e).__name__
             }
         )
 
-@app.post("/analyze")
-async def analyze_only(
-    file: UploadFile = File(...),
-    hint: Optional[str] = Form(None)
-):
-    """
-    Just analyze the image, don't execute
-    """
-    try:
-        image_data = await file.read()
-        ui_schema = vision_engine.analyze_image(image_data, hint=hint)
-        
-        return {
-            "status": "success",
-            "ui_schema": ui_schema.model_dump()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Removed /analyze endpoint - not used by frontend
+# Frontend only uses /analyze-and-execute
 
 @app.post("/check-prescription-interactions")
 async def check_prescription_interactions(
@@ -316,6 +454,112 @@ async def check_prescription_interactions(
             }
         )
         
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+@app.post("/get-diet-recommendations")
+async def get_diet_recommendations(
+    condition: str = Form(...),
+    medications: Optional[str] = Form(None),
+    dietary_restrictions: Optional[str] = Form(None)
+):
+    """
+    Get diet recommendations based on medical condition
+    Used by DietPortal component
+    """
+    try:
+        med_list = [m.strip() for m in medications.split(",")] if medications else None
+        restrictions_list = [r.strip() for r in dietary_restrictions.split(",")] if dietary_restrictions else None
+        
+        recommendation = diet_advisor.get_diet_recommendations(
+            condition=condition,
+            medications=med_list,
+            dietary_restrictions=restrictions_list
+        )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "recommendations": recommendation.model_dump()
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+@app.post("/check-food-compatibility")
+async def check_food_compatibility(
+    food_item: str = Form(...),
+    condition: Optional[str] = Form(None),
+    medications: Optional[str] = Form(None)
+):
+    """
+    Check if a food item is compatible with condition/medications
+    Used by DietPortal component
+    """
+    try:
+        med_list = [m.strip() for m in medications.split(",")] if medications else None
+        
+        compatibility = diet_advisor.check_food_compatibility(
+            food_item=food_item,
+            condition=condition,
+            medications=med_list
+        )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "compatibility": compatibility
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+@app.post("/generate-meal-plan")
+async def generate_meal_plan(
+    condition: str = Form(...),
+    days: int = Form(7),
+    dietary_restrictions: Optional[str] = Form(None)
+):
+    """
+    Generate a meal plan for a medical condition
+    Used by DietPortal component
+    """
+    try:
+        restrictions_list = [r.strip() for r in dietary_restrictions.split(",")] if dietary_restrictions else None
+        
+        meal_plan = diet_advisor.generate_meal_plan(
+            condition=condition,
+            days=days,
+            dietary_restrictions=restrictions_list
+        )
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "meal_plan": meal_plan
+            }
+        )
     except Exception as e:
         return JSONResponse(
             status_code=500,
