@@ -1,16 +1,42 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { analyzeAndExecute } from '../lib/api';
+import ProgressTracker from './ProgressTracker';
+import { useHealthScan } from '../context/HealthScanContext';
 
 export default function InteractionChecker() {
+  const router = useRouter();
+  const {
+    prescriptionData,
+    setInteractionResult,
+    setCurrentStep,
+    errors,
+    setError,
+    clearErrors,
+    navigateToDiet,
+  } = useHealthScan();
+  
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [allergies, setAllergies] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Set current step on mount
+  useEffect(() => {
+    setCurrentStep('interactions');
+  }, [setCurrentStep]);
+  
+  // Show info if prescription data is available from Scanner
+  useEffect(() => {
+    if (prescriptionData && prescriptionData.medications.length > 0 && images.length === 0) {
+      // Data available from previous step
+    }
+  }, [prescriptionData, images.length]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -24,21 +50,24 @@ export default function InteractionChecker() {
         });
       });
       Promise.all(previews).then(setImagePreviews);
-      setError(null);
+      setLocalError(null);
       setResult(null);
+      clearErrors();
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (images.length === 0) {
-      setError('Please select at least one prescription image');
+      setLocalError('Please select at least one prescription image');
+      setError('interactions', 'Please select at least one prescription image');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setLocalError(null);
     setResult(null);
+    clearErrors();
 
     try {
       const formData = new FormData();
@@ -63,8 +92,24 @@ export default function InteractionChecker() {
 
       const data = await response.json();
       setResult(data);
+      
+      // Store in context
+      setInteractionResult({
+        warnings: data.warnings || { major: [], moderate: [], minor: [] },
+        prescription_details: data.prescription_details || [],
+      });
+      
+      clearErrors();
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      const errorMsg = err.message || 'Something went wrong';
+      setLocalError(errorMsg);
+      
+      // Error recovery: Retry suggestion
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('interactions', 'Network error. Please check your connection and try again.');
+      } else {
+        setError('interactions', errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,7 +120,8 @@ export default function InteractionChecker() {
     setImagePreviews([]);
     setAllergies('');
     setResult(null);
-    setError(null);
+    setLocalError(null);
+    clearErrors();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -165,9 +211,17 @@ export default function InteractionChecker() {
             )}
           </button>
 
-          {error && (
+          {(localError || errors.interactions) && (
             <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
-              {error}
+              <p>{localError || errors.interactions}</p>
+              {localError?.includes('Network') && (
+                <button
+                  onClick={handleSubmit}
+                  className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-800 rounded text-sm"
+                >
+                  🔄 Retry
+                </button>
+              )}
             </div>
           )}
         </form>
@@ -237,12 +291,29 @@ export default function InteractionChecker() {
                 </div>
               )}
 
-              <button
-                onClick={handleReset}
-                className="mt-4 text-sm text-zinc-400 hover:text-white"
-              >
-                Check another set of prescriptions
-              </button>
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Check Another Set
+                </button>
+                {result && result.warnings && (
+                  <button
+                    onClick={() => {
+                      // Extract medication names from result
+                      const medNames = result.prescription_details?.map((p: any) => p.medication_name).filter(Boolean).join(', ') || '';
+                      if (medNames) {
+                        localStorage.setItem('current_medications', medNames);
+                      }
+                      router.push('/diet');
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    🥗 Get Diet Advice
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

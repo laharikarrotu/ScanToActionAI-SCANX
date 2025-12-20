@@ -38,19 +38,41 @@ class BrowserExecutor:
         self.page = await self.context.new_page()
     
     async def close(self):
-        """Close browser session"""
+        """Close browser session with timeout protection"""
+        import asyncio
+        import logging
+        
+        async def _cleanup():
+            """Internal cleanup with proper await"""
+            try:
+                if self.page:
+                    await self.page.close()
+                    self.page = None
+                if self.context:
+                    await self.context.close()
+                    self.context = None
+                if self.browser:
+                    await self.browser.close()
+                    self.browser = None
+                if self.playwright:
+                    await self.playwright.stop()
+                    self.playwright = None
+            except Exception as e:
+                logging.warning(f"Error during browser cleanup: {e}")
+        
         try:
-            if self.page:
-                await self.page.close()
-            if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
-            if self.playwright:
-                await self.playwright.stop()
+            # Add timeout to prevent hanging (5 seconds max)
+            await asyncio.wait_for(_cleanup(), timeout=5.0)
+        except asyncio.TimeoutError:
+            logging.error("Browser cleanup timed out - forcing shutdown")
+            # Force cleanup on timeout
+            try:
+                if self.playwright:
+                    self.playwright = None
+            except:
+                pass
         except Exception as e:
             # Log but don't raise - cleanup should be best effort
-            import logging
             logging.warning(f"Error closing browser executor: {e}")
     
     async def _find_element_selector(self, element_id: str, ui_schema: Dict[str, Any], page: Page) -> Optional[str]:

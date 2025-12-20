@@ -134,6 +134,42 @@ class CacheManager:
                 self.client.delete(*keys)
         except Exception as e:
             print(f"Cache invalidation error: {e}")
+    
+    def get_prescription(self, image_hash: str) -> Optional[dict]:
+        """Get cached prescription extraction result"""
+        key = self._make_key("prescription", image_hash)
+        return self.get(key)
+    
+    def set_prescription(self, image_hash: str, prescription: dict, ttl: int = 86400):
+        """Cache prescription extraction (24 hours default - prescriptions don't change)"""
+        key = self._make_key("prescription", image_hash)
+        self.set(key, prescription, ttl)
+    
+    def get_interactions(self, medications_hash: str, allergies_hash: str = "") -> Optional[dict]:
+        """Get cached interaction check result"""
+        combined = f"{medications_hash}:{allergies_hash}"
+        key = self._make_key("interactions", combined)
+        return self.get(key)
+    
+    def set_interactions(self, medications_hash: str, allergies_hash: str, result: dict, ttl: int = 86400):
+        """Cache interaction check (24 hours default)"""
+        combined = f"{medications_hash}:{allergies_hash}"
+        key = self._make_key("interactions", combined)
+        self.set(key, result, ttl)
+    
+    def get_diet_recommendations(self, condition: str, medications: str = "", restrictions: str = "") -> Optional[dict]:
+        """Get cached diet recommendations"""
+        combined = f"{condition}:{medications}:{restrictions}"
+        combined_hash = hashlib.md5(combined.encode()).hexdigest()
+        key = self._make_key("diet", combined_hash)
+        return self.get(key)
+    
+    def set_diet_recommendations(self, condition: str, medications: str, restrictions: str, result: dict, ttl: int = 86400):
+        """Cache diet recommendations (24 hours default)"""
+        combined = f"{condition}:{medications}:{restrictions}"
+        combined_hash = hashlib.md5(combined.encode()).hexdigest()
+        key = self._make_key("diet", combined_hash)
+        self.set(key, result, ttl)
 
 # Global cache instance
 cache_manager = CacheManager()

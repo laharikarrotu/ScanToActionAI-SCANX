@@ -1,27 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import ProgressTracker from './ProgressTracker';
+import { useHealthScan } from '../context/HealthScanContext';
 
 export default function DietPortal() {
-  const [condition, setCondition] = useState('');
-  const [medications, setMedications] = useState('');
-  const [dietaryRestrictions, setDietaryRestrictions] = useState('');
+  const {
+    prescriptionData,
+    dietData,
+    setDietData,
+    setCurrentStep,
+    errors,
+    setError,
+    clearErrors,
+    validateStep,
+  } = useHealthScan();
+  
+  const [condition, setCondition] = useState(dietData?.condition || '');
+  const [medications, setMedications] = useState(dietData?.medications || '');
+  const [dietaryRestrictions, setDietaryRestrictions] = useState(dietData?.dietary_restrictions || '');
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'recommendations' | 'food-check' | 'meal-plan'>('recommendations');
+  
+  // Set current step on mount
+  useEffect(() => {
+    setCurrentStep('diet');
+  }, [setCurrentStep]);
+  
+  // Auto-populate from context
+  useEffect(() => {
+    if (prescriptionData && prescriptionData.medications.length > 0 && !medications) {
+      const medNames = prescriptionData.medications.map(m => m.medication_name).join(', ');
+      setMedications(medNames);
+      setDietData({
+        condition: condition || '',
+        medications: medNames,
+        dietary_restrictions: dietaryRestrictions || '',
+      });
+    }
+  }, [prescriptionData, medications, condition, dietaryRestrictions, setDietData]);
+  
+  // Update context when form changes
+  useEffect(() => {
+    setDietData({
+      condition,
+      medications,
+      dietary_restrictions: dietaryRestrictions,
+    });
+  }, [condition, medications, dietaryRestrictions, setDietData]);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const handleGetRecommendations = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!condition.trim()) {
-      setError('Please enter a medical condition');
+    
+    // Validate step
+    const validation = validateStep('diet');
+    if (!validation.valid) {
+      setLocalError(validation.message || 'Please enter a medical condition');
+      setError('diet', validation.message || 'Please enter a medical condition');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setLocalError(null);
+    clearErrors();
 
     try {
       const formData = new FormData();
@@ -41,8 +86,16 @@ export default function DietPortal() {
 
       const data = await response.json();
       setRecommendations(data.recommendations);
+      clearErrors();
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      const errorMsg = err.message || 'Something went wrong';
+      setLocalError(errorMsg);
+      setError('diet', errorMsg);
+      
+      // Error recovery
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('diet', 'Network error. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -54,12 +107,14 @@ export default function DietPortal() {
   const handleCheckFood = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!foodItem.trim()) {
-      setError('Please enter a food item');
+      setLocalError('Please enter a food item');
+      setError('diet', 'Please enter a food item');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setLocalError(null);
+    clearErrors();
 
     try {
       const formData = new FormData();
@@ -79,8 +134,11 @@ export default function DietPortal() {
 
       const data = await response.json();
       setFoodCheckResult(data.compatibility);
+      clearErrors();
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      const errorMsg = err.message || 'Something went wrong';
+      setLocalError(errorMsg);
+      setError('diet', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -92,12 +150,14 @@ export default function DietPortal() {
   const handleGenerateMealPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!condition.trim()) {
-      setError('Please enter a medical condition');
+      setLocalError('Please enter a medical condition');
+      setError('diet', 'Please enter a medical condition');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setLocalError(null);
+    clearErrors();
 
     try {
       const formData = new FormData();
@@ -117,8 +177,11 @@ export default function DietPortal() {
 
       const data = await response.json();
       setMealPlan(data.meal_plan);
+      clearErrors();
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      const errorMsg = err.message || 'Something went wrong';
+      setLocalError(errorMsg);
+      setError('diet', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -420,9 +483,20 @@ export default function DietPortal() {
           </div>
         )}
 
-        {error && (
+        {(localError || errors.diet) && (
           <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200 mt-4">
-            {error}
+            <p>{localError || errors.diet}</p>
+            {(localError || errors.diet)?.includes('Network') && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (activeTab === 'recommendations') handleGetRecommendations(e);
+                }}
+                className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-800 rounded text-sm"
+              >
+                🔄 Retry
+              </button>
+            )}
           </div>
         )}
       </div>

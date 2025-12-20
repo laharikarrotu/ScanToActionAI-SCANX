@@ -639,5 +639,1051 @@
       "error": "Executable doesn't exist at /Users/laharikarrotu/Library/Caches/ms-playwright/chromium-1097/chrome-mac/Chromium.app/Contents/MacOS/Chromium\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551 Looks like Playwright was just installed or updated.       \u2551\n\u2551 Please run the following command to download new browsers: \u2551\n\u2551                                                            \u2551\n\u2551     playwright install                                     \u2551\n\u2551                                                            \u2551\n\u2551 <3 Playwright Team                                         \u2551\n\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d",
       "endpoint": "analyze-and-execute"
     }
+  },
+  {
+    "timestamp": "2025-12-20T04:21:15.128257",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:21:16.024352",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:21:16.086847",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process other (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        },
+        {
+          "step": 6,
+          "action": "read",
+          "target": "ocr_text_5",
+          "value": null,
+          "description": "Read: pernostil bid"
+        },
+        {
+          "step": 7,
+          "action": "read",
+          "target": "ocr_text_6",
+          "value": null,
+          "description": "Read: Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict"
+        },
+        {
+          "step": 8,
+          "action": "read",
+          "target": "ocr_text_7",
+          "value": null,
+          "description": "Read: nostilbid or2 sprays 30.00"
+        },
+        {
+          "step": 9,
+          "action": "read",
+          "target": "ocr_text_8",
+          "value": null,
+          "description": "Read: Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15."
+        },
+        {
+          "step": 10,
+          "action": "read",
+          "target": "ocr_text_9",
+          "value": null,
+          "description": "Read: Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00"
+        }
+      ],
+      "estimated_time": 20
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:21:18.812355",
+    "type": "execution_result",
+    "session_id": null,
+    "data": {
+      "status": "error",
+      "message": "Execution failed: Target page, context or browser has been closed",
+      "final_url": "https://example.com/",
+      "screenshot_path": null,
+      "error": "Target page, context or browser has been closed",
+      "logs": [
+        "Navigating to https://example.com",
+        "Step 1: read on ocr_text_0",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_0",
+        "\u2717 Skipping step 1 - element not found",
+        "Step 2: read on ocr_text_1",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_1",
+        "\u2717 Skipping step 2 - element not found",
+        "Step 3: read on ocr_text_2",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_2",
+        "\u2717 Skipping step 3 - element not found",
+        "Step 4: read on ocr_text_3",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_3",
+        "\u2717 Skipping step 4 - element not found",
+        "Step 5: read on ocr_text_4",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_4",
+        "\u2717 Skipping step 5 - element not found",
+        "Step 6: read on ocr_text_5",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_5",
+        "\u2717 Skipping step 6 - element not found",
+        "Step 7: read on ocr_text_6",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_6",
+        "\u2717 Skipping step 7 - element not found",
+        "Step 8: read on ocr_text_7",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_7",
+        "\u2717 Skipping step 8 - element not found",
+        "Step 9: read on ocr_text_8",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_8",
+        "\u2717 Skipping step 9 - element not found",
+        "Step 10: read on ocr_text_9",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_9",
+        "\u2717 Skipping step 10 - element not found"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:23:16.962504",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription\r\n"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:23:17.760631",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:23:17.830565",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process other (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        },
+        {
+          "step": 6,
+          "action": "read",
+          "target": "ocr_text_5",
+          "value": null,
+          "description": "Read: pernostil bid"
+        },
+        {
+          "step": 7,
+          "action": "read",
+          "target": "ocr_text_6",
+          "value": null,
+          "description": "Read: Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict"
+        },
+        {
+          "step": 8,
+          "action": "read",
+          "target": "ocr_text_7",
+          "value": null,
+          "description": "Read: nostilbid or2 sprays 30.00"
+        },
+        {
+          "step": 9,
+          "action": "read",
+          "target": "ocr_text_8",
+          "value": null,
+          "description": "Read: Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15."
+        },
+        {
+          "step": 10,
+          "action": "read",
+          "target": "ocr_text_9",
+          "value": null,
+          "description": "Read: Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00"
+        }
+      ],
+      "estimated_time": 20
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:23:20.542363",
+    "type": "execution_result",
+    "session_id": null,
+    "data": {
+      "status": "error",
+      "message": "Execution failed: Target page, context or browser has been closed",
+      "final_url": "https://example.com/",
+      "screenshot_path": null,
+      "error": "Target page, context or browser has been closed",
+      "logs": [
+        "Navigating to https://example.com",
+        "Step 1: read on ocr_text_0",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_0",
+        "\u2717 Skipping step 1 - element not found",
+        "Step 2: read on ocr_text_1",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_1",
+        "\u2717 Skipping step 2 - element not found",
+        "Step 3: read on ocr_text_2",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_2",
+        "\u2717 Skipping step 3 - element not found",
+        "Step 4: read on ocr_text_3",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_3",
+        "\u2717 Skipping step 4 - element not found",
+        "Step 5: read on ocr_text_4",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_4",
+        "\u2717 Skipping step 5 - element not found",
+        "Step 6: read on ocr_text_5",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_5",
+        "\u2717 Skipping step 6 - element not found",
+        "Step 7: read on ocr_text_6",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_6",
+        "\u2717 Skipping step 7 - element not found",
+        "Step 8: read on ocr_text_7",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_7",
+        "\u2717 Skipping step 8 - element not found",
+        "Step 9: read on ocr_text_8",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_8",
+        "\u2717 Skipping step 9 - element not found",
+        "Step 10: read on ocr_text_9",
+        "\u26a0\ufe0f Warning: Could not find selector for ocr_text_9",
+        "\u2717 Skipping step 10 - element not found"
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:24:54.425483",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "help me understand this prescription\r\n"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:24:55.266956",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:24:55.330841",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process other (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        },
+        {
+          "step": 6,
+          "action": "read",
+          "target": "ocr_text_5",
+          "value": null,
+          "description": "Read: pernostil bid"
+        },
+        {
+          "step": 7,
+          "action": "read",
+          "target": "ocr_text_6",
+          "value": null,
+          "description": "Read: Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict"
+        },
+        {
+          "step": 8,
+          "action": "read",
+          "target": "ocr_text_7",
+          "value": null,
+          "description": "Read: nostilbid or2 sprays 30.00"
+        },
+        {
+          "step": 9,
+          "action": "read",
+          "target": "ocr_text_8",
+          "value": null,
+          "description": "Read: Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15."
+        },
+        {
+          "step": 10,
+          "action": "read",
+          "target": "ocr_text_9",
+          "value": null,
+          "description": "Read: Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00"
+        }
+      ],
+      "estimated_time": 20
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:25:42.446790",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "what is this about?"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:25:46.117458",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T04:25:46.190326",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process other (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        },
+        {
+          "step": 6,
+          "action": "read",
+          "target": "ocr_text_5",
+          "value": null,
+          "description": "Read: pernostil bid"
+        },
+        {
+          "step": 7,
+          "action": "read",
+          "target": "ocr_text_6",
+          "value": null,
+          "description": "Read: Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict"
+        },
+        {
+          "step": 8,
+          "action": "read",
+          "target": "ocr_text_7",
+          "value": null,
+          "description": "Read: nostilbid or2 sprays 30.00"
+        },
+        {
+          "step": 9,
+          "action": "read",
+          "target": "ocr_text_8",
+          "value": null,
+          "description": "Read: Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15."
+        },
+        {
+          "step": 10,
+          "action": "read",
+          "target": "ocr_text_9",
+          "value": null,
+          "description": "Read: Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00"
+        }
+      ],
+      "estimated_time": 20
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:10.082274",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": " ok"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:10.508913",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:10.509755",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process document (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        }
+      ],
+      "estimated_time": 10
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:55.606206",
+    "type": "scan_request",
+    "session_id": null,
+    "data": {
+      "image_hash": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+      "intent": "diet"
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:56.006943",
+    "type": "ui_schema",
+    "session_id": null,
+    "data": {
+      "page_type": "other",
+      "url_hint": null,
+      "elements": [
+        {
+          "id": "ocr_text_0",
+          "type": "text",
+          "label": "Table 1. Intranasal H,-Antihistamines",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_1",
+          "type": "text",
+          "label": "Drag Usual Dosage Cost!",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_2",
+          "type": "text",
+          "label": "Rzelastine 0. = El2yre 1-2 sprays per",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_3",
+          "type": "text",
+          "label": "generic nostil bid? $18.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_4",
+          "type": "text",
+          "label": "6 mos-11 yrs: 1 spray",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_5",
+          "type": "text",
+          "label": "pernostil bid",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_6",
+          "type": "text",
+          "label": "Raelastine 0.15% \u2014 E12yrs 1-2 oprays per generict",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_7",
+          "type": "text",
+          "label": "nostilbid or2 sprays 30.00",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_8",
+          "type": "text",
+          "label": "Astepro Alfergy\u00ae (Bayer) per nostril once/day\u00ae 15.007",
+          "value": null,
+          "position": null
+        },
+        {
+          "id": "ocr_text_9",
+          "type": "text",
+          "label": "Ghitdren\u2019s Astepro Alergy 6-1 yrs:1 sprayper 18,00 (Bayer) nostril bid",
+          "value": null,
+          "position": null
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": "2025-12-20T18:55:56.007869",
+    "type": "action_plan",
+    "session_id": null,
+    "data": {
+      "task": "Process document (fallback)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "read",
+          "target": "ocr_text_0",
+          "value": null,
+          "description": "Read: Table 1. Intranasal H,-Antihistamines"
+        },
+        {
+          "step": 2,
+          "action": "read",
+          "target": "ocr_text_1",
+          "value": null,
+          "description": "Read: Drag Usual Dosage Cost!"
+        },
+        {
+          "step": 3,
+          "action": "read",
+          "target": "ocr_text_2",
+          "value": null,
+          "description": "Read: Rzelastine 0. = El2yre 1-2 sprays per"
+        },
+        {
+          "step": 4,
+          "action": "read",
+          "target": "ocr_text_3",
+          "value": null,
+          "description": "Read: generic nostil bid? $18.00"
+        },
+        {
+          "step": 5,
+          "action": "read",
+          "target": "ocr_text_4",
+          "value": null,
+          "description": "Read: 6 mos-11 yrs: 1 spray"
+        }
+      ],
+      "estimated_time": 10
+    }
   }
 ]

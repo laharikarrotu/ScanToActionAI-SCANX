@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 import sys
 import os
+import json
+import asyncio
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,9 +16,14 @@ from vision.image_quality import ImageQualityChecker
 from planner.agent_planner import PlannerEngine, ActionPlan
 from executor.browser_executor import BrowserExecutor, ExecutionResult
 from memory.event_log import EventLogger
+from core.error_handler import ErrorHandler, handle_errors
+from core.resource_manager import ResourceManager
+from core.encryption import ImageEncryption
+from core.audit_logger import AuditLogger, AuditAction
+from core.streaming import StreamingResponseBuilder
 from api.config import settings
 from api.auth import create_access_token, verify_token
-from medication.prescription_extractor import PrescriptionExtractor
+from medication.prescription_extractor import PrescriptionExtractor, PrescriptionInfo
 from medication.interaction_checker import InteractionChecker, Medication
 from nutrition.diet_advisor import DietAdvisor
 from nutrition.condition_advisor import ConditionAdvisor
@@ -97,26 +104,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize engines - Use Gemini if available, otherwise OpenAI
+# Initialize engines - Use combined analyzer if Gemini available, otherwise separate engines
+USE_COMBINED_ANALYZER = False
+combined_analyzer = None
+vision_engine = None
+planner_engine = None
+
 try:
     if settings.gemini_api_key:
-        from vision.gemini_detector import GeminiVisionEngine
-        from planner.gemini_planner import GeminiPlannerEngine
-        vision_engine = GeminiVisionEngine(api_key=settings.gemini_api_key)
-        planner_engine = GeminiPlannerEngine(api_key=settings.gemini_api_key)
-        print("✅ Using Gemini Pro 1.5 for Vision and Planning")
+        # Try combined analyzer first (1 API call instead of 2) - OPTIMIZATION!
+        try:
+            from vision.combined_analyzer import CombinedAnalyzer
+            combined_analyzer = CombinedAnalyzer(api_key=settings.gemini_api_key)
+            USE_COMBINED_ANALYZER = True
+            print("✅ Using Combined Analyzer (Vision + Planning in 1 call) - 50% faster & cheaper!")
+        except Exception as e:
+            print(f"⚠️  Combined analyzer failed: {e}, using separate engines")
+            USE_COMBINED_ANALYZER = False
+            from vision.gemini_detector import GeminiVisionEngine
+            from planner.gemini_planner import GeminiPlannerEngine
+            vision_engine = GeminiVisionEngine(api_key=settings.gemini_api_key)
+            planner_engine = GeminiPlannerEngine(api_key=settings.gemini_api_key)
+            print("✅ Using Gemini Pro 1.5 for Vision and Planning (separate calls)")
     else:
+        USE_COMBINED_ANALYZER = False
         vision_engine = VisionEngine(api_key=settings.openai_api_key)
         planner_engine = PlannerEngine(api_key=settings.openai_api_key)
         print("✅ Using OpenAI GPT-4o for Vision and Planning")
 except Exception as e:
     print(f"⚠️  Gemini setup failed: {e}, using OpenAI")
+    USE_COMBINED_ANALYZER = False
     vision_engine = VisionEngine(api_key=settings.openai_api_key)
     planner_engine = PlannerEngine(api_key=settings.openai_api_key)
+
 event_logger = EventLogger()
+error_handler = ErrorHandler(max_retries=3, retry_delay=1.0)
+resource_manager = ResourceManager(default_timeout=30.0)
+# HIPAA Compliance: Image encryption and audit logging
+image_encryption = ImageEncryption()
+audit_logger = AuditLogger()
 prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
 interaction_checker = InteractionChecker()
+# Force Gemini for diet advisor if available (cheaper and avoids OpenAI quota issues)
 diet_advisor = DietAdvisor(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
+if settings.gemini_api_key:
+    print("✅ Diet Advisor using Gemini Pro 1.5 (cheaper & avoids quota issues)")
+else:
+    print("⚠️  Diet Advisor using OpenAI (Gemini API key not set)")
 
 # Rate limiter selection (priority: Redis > Database > Token Bucket > In-Memory)
 if REDIS_RATE_LIMITER_AVAILABLE and RedisRateLimiter:
@@ -181,6 +215,82 @@ class AnalyzeRequest(BaseModel):
     intent: str
     context: Optional[dict] = None
 
+@app.post("/extract-prescription")
+async def extract_prescription_direct(
+    request: Request,
+    file: UploadFile = File(...),
+    stream: bool = Form(False)  # Optional: enable streaming
+):
+    """
+    FAST DIRECT ENDPOINT: Extract prescription data immediately
+    Like ChatGPT - just scan and get medications directly
+    No vision/planner steps, just pure extraction
+    
+    Set stream=true for Server-Sent Events (SSE) progress updates
+    """
+    try:
+        # Read image
+        image_data = await file.read()
+        
+        # HIPAA Compliance: Log image upload
+        client_ip = request.client.host if request.client else "unknown"
+        image_hash = hashlib.md5(image_data).hexdigest()
+        audit_logger.log_image_upload(user_id=None, image_hash=image_hash, ip_address=client_ip)
+        
+        # HIPAA Compliance: Encrypt image before processing (optional - can be enabled)
+        # For now, we process in memory without storing encrypted version
+        # Uncomment below to enable encryption:
+        # encrypted_image = image_encryption.encrypt_image(image_data)
+        # Store encrypted_image instead of image_data if needed
+        
+        # Check cache first (if available)
+        if CACHE_AVAILABLE and cache_manager:
+            cached_prescription = cache_manager.get_prescription(image_hash)
+            if cached_prescription:
+                import logging
+                logging.info(f"Cache hit for prescription {image_hash[:8]}...")
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "cached": True,
+                        "prescription_info": cached_prescription,
+                        "message": "Prescription extracted successfully (cached)"
+                    }
+                )
+        
+        # Direct extraction using prescription extractor
+        prescription = prescription_extractor.extract_from_image(image_data)
+        prescription_dict = prescription.model_dump()
+        
+        # HIPAA Compliance: Log prescription extraction
+        audit_logger.log_prescription_extraction(
+            user_id=None,
+            image_hash=image_hash,
+            ip_address=client_ip
+        )
+        
+        # Cache the result (if available)
+        if CACHE_AVAILABLE and cache_manager:
+            cache_manager.set_prescription(image_hash, prescription_dict, ttl=86400)  # 24 hours
+        
+        # Return structured data immediately
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "prescription_info": prescription_dict,
+                "message": "Prescription extracted successfully"
+            }
+        )
+    except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "extract-prescription"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
+        raise HTTPException(
+            status_code=500,
+            detail=user_friendly_msg
+        )
+
 @app.post("/analyze-and-execute")
 async def analyze_and_execute(
     request: Request,
@@ -211,6 +321,10 @@ async def analyze_and_execute(
         # Read and validate image
         image_data = await file.read()
         
+        # HIPAA Compliance: Log image upload
+        image_hash = hashlib.md5(image_data).hexdigest()
+        audit_logger.log_image_upload(user_id=None, image_hash=image_hash, ip_address=client_ip)
+        
         # Check file size (max 10MB)
         if len(image_data) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Image is too large (max 10MB)")
@@ -231,8 +345,6 @@ async def analyze_and_execute(
                 detail=error_message
             )
         
-        image_hash = hashlib.md5(image_data).hexdigest()
-        
         # Check cache first (if available)
         if CACHE_AVAILABLE and cache_manager:
             cached_result = cache_manager.get_ui_schema(image_hash, intent)
@@ -251,35 +363,104 @@ async def analyze_and_execute(
         # Log request
         event_logger.log_scan_request(image_hash, intent)
         
-        # Step 1: Vision - Understand UI (with circuit breaker protection if available)
-        try:
-            # Wrap synchronous call for circuit breaker
-            def analyze_image_sync():
-                return vision_engine.analyze_image(image_data)
+        # Parse context safely
+        context_dict = None
+        if context:
+            try:
+                import json
+                context_dict = json.loads(context)
+            except json.JSONDecodeError:
+                context_dict = None
+        
+        # OPTIMIZATION: Use combined analyzer if available (1 API call instead of 2)
+        # This saves 50% cost and time by doing vision + planning in one Gemini call
+        ui_schema = None
+        plan = None
+        ui_schema_dict = None
+        plan_dict = None
+        used_combined = False
+        
+        if USE_COMBINED_ANALYZER and combined_analyzer:
+            try:
+                import logging
+                logging.info("🚀 Using combined analyzer (Vision + Planning in 1 call) - 50% faster & cheaper!")
+                
+                # Single API call for both vision and planning
+                def analyze_and_plan_sync():
+                    return combined_analyzer.analyze_and_plan(
+                        image_data=image_data,
+                        user_intent=intent,
+                        context=context_dict
+                    )
+                
+                # Use circuit breaker if available
+                if CIRCUIT_BREAKER_AVAILABLE:
+                    ui_schema, plan = openai_circuit_breaker.call(analyze_and_plan_sync)
+                else:
+                    ui_schema, plan = analyze_and_plan_sync()
+                
+                ui_schema_dict = ui_schema.model_dump()
+                plan_dict = plan.model_dump()
+                
+                event_logger.log_ui_schema(ui_schema_dict)
+                event_logger.log_action_plan(plan_dict)
+                
+                # Cache the result (if available)
+                if CACHE_AVAILABLE and cache_manager:
+                    cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
+                
+                import logging
+                logging.info(f"✅ Combined analysis completed: {len(ui_schema.elements)} elements, {len(plan.steps)} steps (1 API call instead of 2)")
+                
+                used_combined = True
+                
+            except Exception as e:
+                import logging
+                logging.error(f"Combined analyzer error: {str(e)}", exc_info=True)
+                # Fallback to separate calls
+                logging.info("⚠️  Falling back to separate vision + planning calls")
+                used_combined = False
+        
+        # Fallback: Use separate vision and planning calls (if combined analyzer not available or failed)
+        if not used_combined:
+            # Step 1: Vision - Understand UI (with circuit breaker protection if available)
+            try:
+                # Wrap synchronous call for circuit breaker
+                def analyze_image_sync():
+                    return vision_engine.analyze_image(image_data)
+                
+                # Use circuit breaker for protection (or direct call if not available)
+                if CIRCUIT_BREAKER_AVAILABLE:
+                    ui_schema = openai_circuit_breaker.call(analyze_image_sync)
+                else:
+                    ui_schema = analyze_image_sync()
+                ui_schema_dict = ui_schema.model_dump()
+                event_logger.log_ui_schema(ui_schema_dict)
+                
+                # Cache the result (if available)
+                if CACHE_AVAILABLE and cache_manager:
+                    cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
+                
+                # Log for debugging
+                import logging
+                logging.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found")
+
+            except Exception as e:
+                import logging
+                logging.error(f"Vision analysis error: {str(e)}", exc_info=True)
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Vision analysis failed: {str(e)}. Please check your API key and credits."
+                )
             
-            # Use circuit breaker for protection (or direct call if not available)
-            if CIRCUIT_BREAKER_AVAILABLE:
-                ui_schema = openai_circuit_breaker.call(analyze_image_sync)
-            else:
-                ui_schema = analyze_image_sync()
-            ui_schema_dict = ui_schema.model_dump()
-            event_logger.log_ui_schema(ui_schema_dict)
-            
-            # Cache the result (if available)
-            if CACHE_AVAILABLE and cache_manager:
-                cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
-            
-            # Log for debugging
-            import logging
-            logging.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found")
-            
-        except Exception as e:
-            import logging
-            logging.error(f"Vision analysis error: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Vision analysis failed: {str(e)}. Please check your OpenAI API key and credits."
+            # Step 2: Planning - Create action plan
+            plan = planner_engine.create_plan(
+                user_intent=intent,
+                ui_schema=ui_schema_dict,
+                context=context_dict
             )
+            plan_dict = plan.model_dump()
+            event_logger.log_action_plan(plan_dict)
         
         # Check if we have elements - but be more lenient
         if not ui_schema.elements or len(ui_schema.elements) == 0:
@@ -297,25 +478,6 @@ async def analyze_and_execute(
                         "debug": "No elements extracted from image or OCR"
                     }
                 )
-        
-        # Step 2: Planning - Create action plan
-        # Parse context safely (avoid eval() for security)
-        context_dict = None
-        if context:
-            try:
-                import json
-                context_dict = json.loads(context)
-            except json.JSONDecodeError:
-                # If not valid JSON, ignore context
-                context_dict = None
-        
-        plan = planner_engine.create_plan(
-            user_intent=intent,
-            ui_schema=ui_schema_dict,
-            context=context_dict
-        )
-        plan_dict = plan.model_dump()
-        event_logger.log_action_plan(plan_dict)
         
         # Log plan details for debugging
         import logging
@@ -336,11 +498,95 @@ async def analyze_and_execute(
                 }
             )
         
-        # Step 3: Execution - Execute plan
+        # Check if execution is needed (only for actions that require browser)
+        intent_lower = intent.lower() if intent else ""
+        needs_browser = any(word in intent_lower for word in ["fill", "submit", "click", "navigate", "book", "schedule", "complete form"])
+        has_browser_actions = any(step.action in ["click", "fill", "select", "navigate", "submit"] for step in plan.steps)
+        
+        # If all steps are "read" actions, skip browser execution
+        if not needs_browser and not has_browser_actions:
+            # Extract data from detected elements instead
+            extracted_data = {}
+            for elem in ui_schema.elements:
+                if elem.type in ["medication", "dosage", "prescriber", "pharmacy", "data", "text"]:
+                    extracted_data[elem.id] = {
+                        "type": elem.type,
+                        "label": elem.label,
+                        "value": elem.value or elem.label
+                    }
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "success",
+                    "ui_schema": ui_schema_dict,
+                    "plan": plan_dict,
+                    "extracted_data": extracted_data,
+                    "message": f"Successfully extracted {len(extracted_data)} data points from the document. No browser execution needed for read-only operations."
+                }
+            )
+        
+        # Step 3: Execution - Execute plan (only if browser actions are needed)
         executor = BrowserExecutor(headless=True)
         try:
             # Get URL hint from schema or use default
             start_url = ui_schema.url_hint or "https://example.com"
+            
+            # Check if URL is valid (not just a placeholder)
+            if start_url == "https://example.com" and not ui_schema.url_hint:
+                # No real URL available - this is likely a static document
+                # Extract data instead of executing
+                extracted_data = {}
+                structured_data = {}
+                
+                # Try prescription extraction
+                page_type = ui_schema.page_type or ""
+                if "prescription" in page_type.lower() or "medication" in intent_lower:
+                    try:
+                        prescription = prescription_extractor.extract_from_image(image_data)
+                        if prescription and prescription.medication_name != "Unknown":
+                            structured_data = {
+                                "medications": [{
+                                    "medication_name": prescription.medication_name,
+                                    "dosage": prescription.dosage,
+                                    "frequency": prescription.frequency,
+                                    "quantity": prescription.quantity,
+                                    "refills": prescription.refills,
+                                    "instructions": prescription.instructions
+                                }],
+                                "prescriber": prescription.prescriber,
+                                "pharmacy": prescription.pharmacy if hasattr(prescription, 'pharmacy') else None,
+                                "date": prescription.date,
+                                "instructions": prescription.instructions
+                            }
+                    except Exception as e:
+                        import logging
+                        logging.warning(f"Prescription extraction failed: {e}")
+                
+                # Extract from elements
+                for elem in ui_schema.elements:
+                    elem_type = elem.type if hasattr(elem, 'type') else elem.get("type", "")
+                    elem_label = elem.label if hasattr(elem, 'label') else elem.get("label", "")
+                    elem_value = elem.value if hasattr(elem, 'value') else elem.get("value", "")
+                    
+                    if elem_type in ["medication", "dosage", "prescriber", "pharmacy", "data", "text"]:
+                        extracted_data[elem.id] = {
+                            "type": elem_type,
+                            "label": elem_label,
+                            "value": elem_value or elem_label
+                        }
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "ui_schema": ui_schema_dict,
+                        "plan": plan_dict,
+                        "extracted_data": extracted_data,
+                        "structured_data": structured_data if structured_data else None,
+                        "message": f"Document analyzed. Extracted {len(extracted_data)} data points. For form filling, please provide a URL or upload a form that can be filled online."
+                    }
+                )
             
             result = await executor.execute_plan(
                 steps=plan.steps,
@@ -361,25 +607,82 @@ async def analyze_and_execute(
                     "message": result.message
                 }
             )
+        except Exception as exec_error:
+            import logging
+            logging.error(f"Browser execution error: {str(exec_error)}", exc_info=True)
+            
+            # Fallback: Return extracted data even if execution fails
+            extracted_data = {}
+            structured_data = {}
+            
+            # Try prescription extraction
+            page_type = ui_schema.page_type or ""
+            if "prescription" in page_type.lower() or "medication" in intent_lower:
+                try:
+                    prescription = prescription_extractor.extract_from_image(image_data)
+                    if prescription and prescription.medication_name != "Unknown":
+                        structured_data = {
+                            "medications": [{
+                                "medication_name": prescription.medication_name,
+                                "dosage": prescription.dosage,
+                                "frequency": prescription.frequency,
+                                "quantity": prescription.quantity,
+                                "refills": prescription.refills,
+                                "instructions": prescription.instructions
+                            }],
+                            "prescriber": prescription.prescriber,
+                            "pharmacy": prescription.pharmacy if hasattr(prescription, 'pharmacy') else None,
+                            "date": prescription.date,
+                            "instructions": prescription.instructions
+                        }
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Prescription extraction failed: {e}")
+            
+            # Extract from elements
+            for elem in ui_schema.elements:
+                elem_type = elem.type if hasattr(elem, 'type') else elem.get("type", "")
+                elem_label = elem.label if hasattr(elem, 'label') else elem.get("label", "")
+                elem_value = elem.value if hasattr(elem, 'value') else elem.get("value", "")
+                
+                if elem_type in ["medication", "dosage", "prescriber", "pharmacy", "data", "text"]:
+                    extracted_data[elem.id] = {
+                        "type": elem_type,
+                        "label": elem_label,
+                        "value": elem_value or elem_label
+                    }
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "partial",
+                    "ui_schema": ui_schema_dict,
+                    "plan": plan_dict,
+                    "extracted_data": extracted_data,
+                    "structured_data": structured_data if structured_data else None,
+                    "message": f"Browser execution failed (likely no website to interact with). Extracted {len(extracted_data)} data points from the document instead."
+                }
+            )
         finally:
-            await executor.close()
+            try:
+                await executor.close()
+            except:
+                pass  # Ignore errors during cleanup
             
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        # Log the full error for debugging
-        import logging
-        logging.error(f"Error in analyze-and-execute: {error_msg}", exc_info=True)
-        event_logger.log_event("error", {"error": error_msg, "endpoint": "analyze-and-execute"})
+        # Use enhanced error handler
+        ErrorHandler.log_error(e, {"endpoint": "analyze-and-execute"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
+        event_logger.log_event("error", {"error": str(e), "endpoint": "analyze-and-execute"})
         
-        # Return more detailed error for debugging (in development)
-        # In production, you might want to hide some details
+        # Return user-friendly error message
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": error_msg if "API key" in error_msg or "blurry" in error_msg.lower() or "quality" in error_msg.lower() else f"An error occurred: {error_msg}",
+                "message": user_friendly_msg,
                 "error_type": type(e).__name__
             }
         )
@@ -408,11 +711,30 @@ async def check_prescription_interactions(
         # Extract medication info from all prescriptions
         medications = []
         prescription_details = []
+        medication_names = []
         
         for file in files:
             image_data = await file.read()
-            prescription = prescription_extractor.extract_from_image(image_data)
+            image_hash = hashlib.md5(image_data).hexdigest()
+            
+            # Check cache for prescription extraction
+            cached_prescription = None
+            if CACHE_AVAILABLE and cache_manager:
+                cached_prescription = cache_manager.get_prescription(image_hash)
+            
+            if cached_prescription:
+                prescription = PrescriptionInfo(**cached_prescription)
+                import logging
+                logging.info(f"Using cached prescription for {image_hash[:8]}...")
+            else:
+                prescription = prescription_extractor.extract_from_image(image_data)
+                prescription_dict = prescription.model_dump()
+                # Cache prescription extraction
+                if CACHE_AVAILABLE and cache_manager:
+                    cache_manager.set_prescription(image_hash, prescription_dict, ttl=86400)
+            
             prescription_details.append(prescription.model_dump())
+            medication_names.append(prescription.medication_name)
             
             # Convert to Medication object for interaction checking
             medications.append(Medication(
@@ -426,6 +748,37 @@ async def check_prescription_interactions(
         if allergies:
             allergy_list = [a.strip() for a in allergies.split(",")]
         
+        # Create hash for interaction check cache key
+        medications_str = ",".join(sorted(medication_names))
+        allergies_str = ",".join(sorted(allergy_list)) if allergy_list else ""
+        medications_hash = hashlib.md5(medications_str.encode()).hexdigest()
+        allergies_hash = hashlib.md5(allergies_str.encode()).hexdigest() if allergies_str else ""
+        
+        # Check cache for interaction results
+        if CACHE_AVAILABLE and cache_manager:
+            cached_interactions = cache_manager.get_interactions(medications_hash, allergies_hash)
+            if cached_interactions:
+                import logging
+                logging.info(f"Cache hit for interactions {medications_hash[:8]}...")
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "cached": True,
+                        "prescription_details": prescription_details,
+                        "warnings": cached_interactions.get("warnings", {}),
+                        "message": f"Found interactions (cached). {cached_interactions.get('message', '')}"
+                    }
+                )
+        
+        # HIPAA Compliance: Log interaction check (accessing PHI)
+        audit_logger.log_data_access(
+            user_id=None,
+            resource_type="prescription_interactions",
+            resource_id=",".join(medication_names),
+            ip_address=client_ip
+        )
+        
         # Check for interactions
         warnings = await interaction_checker.check_interactions(
             medications=medications,
@@ -436,6 +789,24 @@ async def check_prescription_interactions(
         major_warnings = [w for w in warnings if w.severity == "major"]
         moderate_warnings = [w for w in warnings if w.severity == "moderate"]
         minor_warnings = [w for w in warnings if w.severity == "minor"]
+        
+        warnings_dict = {
+            "major": [w.model_dump() for w in major_warnings],
+            "moderate": [w.model_dump() for w in moderate_warnings],
+            "minor": [w.model_dump() for w in minor_warnings],
+        }
+        
+        # Cache interaction results
+        if CACHE_AVAILABLE and cache_manager:
+            cache_manager.set_interactions(
+                medications_hash,
+                allergies_hash,
+                {
+                    "warnings": warnings_dict,
+                    "message": f"Found {len(major_warnings)} major, {len(moderate_warnings)} moderate, and {len(minor_warnings)} minor interactions."
+                },
+                ttl=86400  # 24 hours
+            )
         
         return JSONResponse(
             status_code=200,
@@ -455,11 +826,13 @@ async def check_prescription_interactions(
         )
         
     except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "generate-meal-plan"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": user_friendly_msg
             }
         )
 
@@ -474,6 +847,24 @@ async def get_diet_recommendations(
     Used by DietPortal component
     """
     try:
+        med_str = medications or ""
+        diet_res_str = dietary_restrictions or ""
+        
+        # Check cache first
+        if CACHE_AVAILABLE and cache_manager:
+            cached_recommendations = cache_manager.get_diet_recommendations(condition, med_str, diet_res_str)
+            if cached_recommendations:
+                import logging
+                logging.info(f"Cache hit for diet recommendations: {condition}")
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "success",
+                        "recommendations": cached_recommendations,
+                        "cached": True
+                    }
+                )
+        
         med_list = [m.strip() for m in medications.split(",")] if medications else None
         restrictions_list = [r.strip() for r in dietary_restrictions.split(",")] if dietary_restrictions else None
         
@@ -482,20 +873,27 @@ async def get_diet_recommendations(
             medications=med_list,
             dietary_restrictions=restrictions_list
         )
+        recommendation_dict = recommendation.model_dump()
+        
+        # Cache the result
+        if CACHE_AVAILABLE and cache_manager:
+            cache_manager.set_diet_recommendations(condition, med_str, diet_res_str, recommendation_dict, ttl=86400)
         
         return JSONResponse(
             status_code=200,
             content={
                 "status": "success",
-                "recommendations": recommendation.model_dump()
+                "recommendations": recommendation_dict
             }
         )
     except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "get-diet-recommendations"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": user_friendly_msg
             }
         )
 
@@ -526,11 +924,13 @@ async def check_food_compatibility(
             }
         )
     except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "check-food-compatibility"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": user_friendly_msg
             }
         )
 
@@ -561,11 +961,13 @@ async def generate_meal_plan(
             }
         )
     except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "generate-meal-plan"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": user_friendly_msg
             }
         )
 

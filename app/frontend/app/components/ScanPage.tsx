@@ -1,17 +1,33 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { analyzeAndExecute } from '../lib/api';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { analyzeAndExecute, extractPrescription } from '../lib/api';
 import ProgressIndicator from './ProgressIndicator';
+import ProgressTracker from './ProgressTracker';
+import { useHealthScan } from '../context/HealthScanContext';
 
 export default function ScanPage() {
+  const router = useRouter();
+  const {
+    prescriptionData,
+    setPrescriptionData,
+    setCurrentStep,
+    errors,
+    setError,
+    clearErrors,
+    navigateToInteractions,
+    navigateToDiet,
+  } = useHealthScan();
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [intent, setIntent] = useState('');
   const [loading, setLoading] = useState(false);
   const [progressStep, setProgressStep] = useState(0);
+  const [progressMessage, setProgressMessage] = useState<string>('');
+  const [progressPercent, setProgressPercent] = useState<number>(0);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -24,8 +40,9 @@ export default function ScanPage() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      setError(null);
+      setLocalError(null);
       setResult(null);
+      clearErrors();
     }
   };
 
@@ -38,54 +55,130 @@ export default function ScanPage() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      setError(null);
+      setLocalError(null);
       setResult(null);
+      clearErrors();
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!image || !intent.trim()) {
-      setError('Please select an image and enter your intent');
+    if (!image) {
+      setLocalError('Please upload an image');
+      setError('scan', 'Please upload an image');
       return;
     }
 
     // Validate image size (max 10MB)
     if (image.size > 10 * 1024 * 1024) {
-      setError('Image is too large. Please use an image smaller than 10MB.');
+      setLocalError('Image is too large. Please use an image smaller than 10MB.');
+      setError('scan', 'Image is too large. Please use an image smaller than 10MB.');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setLocalError(null);
+    clearErrors();
     setResult(null);
-    setProgressStep(1); // Analyzing image
+    setProgressStep(0);
 
     try {
-      const response = await analyzeAndExecute(image, intent);
-      setProgressStep(2); // Planning
+      // FAST MODE: Auto-detect prescription requests for instant extraction
+      const intentLower = intent.toLowerCase().trim();
+      const isPrescriptionRequest = !intent.trim() || 
+        intentLower.includes('prescription') || 
+        intentLower.includes('medication') ||
+        intentLower.includes('extract') ||
+        intentLower.includes('read prescription') ||
+        intentLower.includes('what medications') ||
+        intentLower.includes('show me medications');
       
-      // Check for API errors in response
-      if (response.status === 'error') {
-        setError(response.message || 'Failed to process request');
-        setProgressStep(0);
-        return;
+      if (isPrescriptionRequest) {
+        // ⚡ FAST MODE: Direct extraction like ChatGPT with streaming
+        setProgressStep(1); // Extracting
+        setProgressMessage('Starting extraction...');
+        setProgressPercent(0);
+        
+        const prescriptionResponse = await extractPrescription(
+          image,
+          (progress) => {
+            // Real-time progress updates
+            setProgressMessage(progress.message);
+            setProgressPercent(progress.progress);
+            
+            // Update step based on progress
+            if (progress.step === 'validating') {
+              setProgressStep(1);
+            } else if (progress.step === 'ocr') {
+              setProgressStep(2);
+            } else if (progress.step === 'analyzing') {
+              setProgressStep(3);
+            } else if (progress.step === 'complete') {
+              setProgressStep(4);
+            }
+          }
+        );
+        setProgressStep(4); // Complete
+        
+        // Store in context - check response structure
+        const prescriptionInfo = (prescriptionResponse as any).prescription_info || prescriptionResponse;
+        const extractedData = {
+          medications: prescriptionInfo?.medication_name ? [{
+            medication_name: prescriptionInfo.medication_name,
+            dosage: prescriptionInfo.dosage,
+            frequency: prescriptionInfo.frequency,
+            quantity: prescriptionInfo.quantity,
+            refills: prescriptionInfo.refills,
+            instructions: prescriptionInfo.instructions,
+          }] : [],
+          prescriber: prescriptionInfo?.prescriber,
+          date: prescriptionInfo?.date,
+          imagePreview: imagePreview || undefined,
+        };
+        
+        setPrescriptionData(extractedData);
+        setCurrentStep('scan');
+        clearErrors();
+        
+        setResult({
+          status: 'success',
+          structured_data: {
+            medications: extractedData.medications,
+            prescriber: extractedData.prescriber,
+            date: extractedData.date
+          },
+          message: 'Prescription extracted successfully'
+        });
+      } else {
+        // FULL MODE: For forms and complex documents
+        if (!intent.trim()) {
+          const errorMsg = 'Please enter your intent (e.g., "Fill this form", "Extract data", or leave empty for prescription)';
+          setLocalError(errorMsg);
+          setError('scan', errorMsg);
+          setLoading(false);
+          return;
+        }
+        setProgressStep(1); // Analyzing image
+        const response = await analyzeAndExecute(image, intent);
+        setProgressStep(2); // Planning
+        setProgressStep(3); // Executing
+        setResult(response);
+        setProgressStep(4); // Complete
       }
-      
-      setProgressStep(3); // Executing
-      setResult(response);
-      setProgressStep(4); // Complete
     } catch (err: any) {
       setProgressStep(0);
       // Better error messages
+      const errorMsg = err.message || 'Something went wrong. Please try again.';
+      setLocalError(errorMsg);
+      
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        setError('Cannot connect to server. Make sure the backend is running on http://localhost:8000');
+        setError('scan', 'Cannot connect to server. Make sure the backend is running on http://localhost:8000');
       } else if (err.message?.includes('401') || err.message?.includes('403')) {
-        setError('Authentication failed. Please check your API keys.');
+        setError('scan', 'Authentication failed. Please check your API keys.');
       } else if (err.message?.includes('429')) {
-        setError('Rate limit exceeded. Please try again in a moment.');
+        setError('scan', 'Rate limit exceeded. Please try again in a moment.');
       } else {
-        setError(err.message || 'Something went wrong. Please try again.');
+        setError('scan', errorMsg);
       }
     } finally {
       setLoading(false);
@@ -97,10 +190,19 @@ export default function ScanPage() {
     setImagePreview(null);
     setIntent('');
     setResult(null);
-    setError(null);
+    setLocalError(null);
+    setProgressMessage('');
+    setProgressPercent(0);
+    setProgressStep(0);
+    clearErrors();
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
+
+  // Set current step on mount
+  useEffect(() => {
+    setCurrentStep('scan');
+  }, [setCurrentStep]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4 pb-8">
@@ -109,6 +211,9 @@ export default function ScanPage() {
           <h1 className="text-3xl md:text-4xl font-bold mb-2">HealthScan</h1>
           <p className="text-sm md:text-base text-blue-300 px-2">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
         </div>
+        
+        {/* Progress Tracker */}
+        <ProgressTracker />
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Image Upload Section */}
@@ -170,12 +275,12 @@ export default function ScanPage() {
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              placeholder="e.g., Fill out this patient intake form, Book an appointment for next week, Help me understand this prescription, Extract my insurance information"
+              placeholder="Leave empty for FAST prescription extraction ⚡ OR enter: Fill form, Book appointment, Extract data..."
               className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
               rows={3}
             />
             <p className="text-sm text-zinc-500 mt-2">
-              Examples: Fill medical forms • Book appointments • Read prescriptions • Extract insurance info
+              💡 <strong>Tip:</strong> Leave empty for instant prescription extraction (like ChatGPT) | Or enter intent for form filling
             </p>
           </div>
 
@@ -208,9 +313,17 @@ export default function ScanPage() {
             )}
           </button>
 
-          {error && (
+          {(localError || errors.scan) && (
             <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
-              {error}
+              <p>{localError || errors.scan}</p>
+              {(localError || errors.scan)?.includes('Network') && (
+                <button
+                  onClick={handleSubmit}
+                  className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-800 rounded text-sm"
+                >
+                  🔄 Retry
+                </button>
+              )}
             </div>
           )}
         </form>
@@ -286,6 +399,102 @@ export default function ScanPage() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {result.structured_data && result.structured_data.medications && (
+                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">📋 Extracted Prescription Data</h3>
+                  <div className="space-y-3">
+                    {Array.isArray(result.structured_data.medications) ? (
+                      result.structured_data.medications.map((med: any, idx: number) => (
+                        <div key={idx} className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                          <div className="font-semibold text-white mb-2">{med.medication_name || 'Unknown Medication'}</div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {med.dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{med.dosage}</span></div>}
+                            {med.frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{med.frequency}</span></div>}
+                            {med.quantity && <div><span className="text-zinc-400">Quantity:</span> <span className="text-white">{med.quantity}</span></div>}
+                            {med.refills && <div><span className="text-zinc-400">Refills:</span> <span className="text-white">{med.refills}</span></div>}
+                          </div>
+                          {med.instructions && (
+                            <div className="mt-2 text-xs">
+                              <span className="text-zinc-400">Instructions:</span>
+                              <span className="text-white ml-2">{med.instructions}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
+                        <div className="font-semibold text-white mb-2">{result.structured_data.medications.medication_name || 'Medication'}</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {result.structured_data.medications.dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{result.structured_data.medications.dosage}</span></div>}
+                          {result.structured_data.medications.frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{result.structured_data.medications.frequency}</span></div>}
+                        </div>
+                      </div>
+                    )}
+                    {result.structured_data.prescriber && (
+                      <div className="text-xs text-zinc-400">
+                        Prescriber: <span className="text-white">{result.structured_data.prescriber}</span>
+                      </div>
+                    )}
+                    {result.structured_data.date && (
+                      <div className="text-xs text-zinc-400">
+                        Date: <span className="text-white">{result.structured_data.date}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Quick Actions - Integration Buttons */}
+                  <div className="mt-4 pt-4 border-t border-zinc-700 flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        // Store medications in localStorage
+                        const medications = Array.isArray(result.structured_data.medications) 
+                          ? result.structured_data.medications 
+                          : [result.structured_data.medications];
+                        localStorage.setItem('extracted_medications', JSON.stringify(medications));
+                        localStorage.setItem('prescription_image', imagePreview || '');
+                        router.push('/interactions');
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                    >
+                      💊 Check Drug Interactions
+                    </button>
+                    {result.structured_data.medications && (
+                      <button
+                        onClick={() => {
+                          // Store medications for diet portal
+                          const medications = Array.isArray(result.structured_data.medications) 
+                            ? result.structured_data.medications 
+                            : [result.structured_data.medications];
+                          const medNames = medications.map((m: any) => m.medication_name).join(', ');
+                          localStorage.setItem('current_medications', medNames);
+                          router.push('/diet');
+                        }}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+                      >
+                        🥗 Get Diet Recommendations
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {result.extracted_data && Object.keys(result.extracted_data).length > 0 && (
+                <details className="bg-zinc-900/50 rounded-lg border border-zinc-700">
+                  <summary className="p-4 cursor-pointer text-sm font-semibold text-zinc-300">
+                    Raw Extracted Data ({Object.keys(result.extracted_data).length})
+                  </summary>
+                  <div className="p-4 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                    {Object.entries(result.extracted_data).slice(0, 10).map(([key, value]: [string, any]) => (
+                      <div key={key} className="text-xs p-2 bg-zinc-800 rounded">
+                        <span className="text-blue-400 font-mono">{value.type}</span>
+                        {value.label && <span className="text-zinc-300 ml-2">{value.label}</span>}
+                        {value.value && <span className="text-zinc-500 ml-2">→ {value.value}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
 
               {result.ui_schema && result.ui_schema.elements && (
