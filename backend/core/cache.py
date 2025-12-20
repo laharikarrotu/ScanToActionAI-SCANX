@@ -55,16 +55,29 @@ class CacheManager:
     
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache"""
+        try:
+            from core.monitoring import track_cache_hit, track_cache_miss
+        except ImportError:
+            track_cache_hit = track_cache_miss = lambda x: None
+        
         if not self.client:
-            return self._memory_cache.get(key)
+            result = self._memory_cache.get(key)
+            if result:
+                track_cache_hit("memory")
+            else:
+                track_cache_miss("memory")
+            return result
         
         try:
             data = self.client.get(key)
             if data:
+                track_cache_hit("redis")
                 return pickle.loads(data)
+            track_cache_miss("redis")
         except Exception as e:
             import logging
             logging.error(f"Cache get error: {e}", exc_info=True)
+            track_cache_miss("redis")
         return None
     
     def set(self, key: str, value: Any, ttl: int = 3600):

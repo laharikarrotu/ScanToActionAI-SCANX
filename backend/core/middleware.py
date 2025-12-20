@@ -38,6 +38,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         query_params = dict(request.query_params)
         
+        # Track HTTP request (Prometheus)
+        try:
+            from core.monitoring import http_requests_total, http_request_duration, PROMETHEUS_AVAILABLE
+            if PROMETHEUS_AVAILABLE:
+                # Will track after response
+                pass
+        except ImportError:
+            http_requests_total = http_request_duration = None
+        
         # Get user ID from token if available
         user_id = None
         try:
@@ -68,7 +77,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
-            duration_ms = (time.time() - start_time) * 1000
+            duration = time.time() - start_time
+            duration_ms = duration * 1000
+            
+            # Track HTTP metrics (Prometheus)
+            try:
+                from core.monitoring import http_requests_total, http_request_duration, PROMETHEUS_AVAILABLE
+                if PROMETHEUS_AVAILABLE and http_requests_total and http_request_duration:
+                    status = str(status_code)
+                    # Normalize endpoint path (remove IDs, etc.)
+                    endpoint = path.split('/')[-1] if path else "unknown"
+                    http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
+                    http_request_duration.labels(method=method, endpoint=endpoint).observe(duration)
+            except (ImportError, AttributeError):
+                pass
             
             # Log successful request
             logger.log_request(

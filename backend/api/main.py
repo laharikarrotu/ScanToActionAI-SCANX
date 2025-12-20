@@ -347,7 +347,9 @@ async def extract_prescription_direct(
         if CACHE_AVAILABLE and cache_manager:
             cached_prescription = cache_manager.get_prescription(image_hash)
             if cached_prescription:
+                track_cache_hit("prescription")
                 logger.info(f"Cache hit for prescription {image_hash[:8]}...", context={"cache": "hit", "image_hash": image_hash[:8]})
+                track_prescription_extraction(True)  # Track successful extraction (cached)
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -357,21 +359,36 @@ async def extract_prescription_direct(
                         "message": "Prescription extracted successfully (cached)"
                     }
                 )
+            else:
+                track_cache_miss("prescription")
         
         # Direct extraction using prescription extractor
-        prescription = prescription_extractor.extract_from_image(image_data)
-        prescription_dict = prescription.model_dump()
-        
-        # HIPAA Compliance: Log prescription extraction
-        audit_logger.log_prescription_extraction(
-            user_id=None,
-            image_hash=image_hash,
-            ip_address=client_ip
-        )
-        
-        # Cache the result (if available)
-        if CACHE_AVAILABLE and cache_manager:
-            cache_manager.set_prescription(image_hash, prescription_dict, ttl=86400)  # 24 hours
+        import time
+        start_time = time.time()
+        try:
+            prescription = prescription_extractor.extract_from_image(image_data)
+            prescription_dict = prescription.model_dump()
+            duration = time.time() - start_time
+            
+            # Track LLM API call (prescription extraction uses LLM)
+            track_llm_api_call("openai", "gpt-4o", duration, True)
+            track_prescription_extraction(True)
+            
+            # HIPAA Compliance: Log prescription extraction
+            audit_logger.log_prescription_extraction(
+                user_id=None,
+                image_hash=image_hash,
+                ip_address=client_ip
+            )
+            
+            # Cache the result (if available)
+            if CACHE_AVAILABLE and cache_manager:
+                cache_manager.set_prescription(image_hash, prescription_dict, ttl=86400)  # 24 hours
+        except Exception as e:
+            duration = time.time() - start_time
+            track_llm_api_call("openai", "gpt-4o", duration, False)
+            track_prescription_extraction(False)
+            raise
         
         # Return structured data immediately
         return JSONResponse(
@@ -508,6 +525,8 @@ async def analyze_and_execute(
                 logging.info("🚀 Using combined analyzer (Vision + Planning in 1 call) - 50% faster & cheaper!")
                 
                 # Single API call for both vision and planning
+                import time
+                start_time = time.time()
                 def analyze_and_plan_sync():
                     return combined_analyzer.analyze_and_plan(
                         image_data=image_data,
@@ -516,20 +535,31 @@ async def analyze_and_execute(
                     )
                 
                 # Use circuit breaker if available
-                if CIRCUIT_BREAKER_AVAILABLE:
-                    ui_schema, plan = openai_circuit_breaker.call(analyze_and_plan_sync)
-                else:
-                    ui_schema, plan = analyze_and_plan_sync()
-                
-                ui_schema_dict = ui_schema.model_dump()
-                plan_dict = plan.model_dump()
-                
-                event_logger.log_ui_schema(ui_schema_dict)
-                event_logger.log_action_plan(plan_dict)
-                
-                # Cache the result (if available)
-                if CACHE_AVAILABLE and cache_manager:
-                    cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
+                try:
+                    if CIRCUIT_BREAKER_AVAILABLE:
+                        ui_schema, plan = openai_circuit_breaker.call(analyze_and_plan_sync)
+                    else:
+                        ui_schema, plan = analyze_and_plan_sync()
+                    duration = time.time() - start_time
+                    
+                    # Track LLM API call (combined analyzer uses Gemini)
+                    track_llm_api_call("gemini", "gemini-1.5-pro", duration, True)
+                    track_vision_analysis(True)
+                    
+                    ui_schema_dict = ui_schema.model_dump()
+                    plan_dict = plan.model_dump()
+                    
+                    event_logger.log_ui_schema(ui_schema_dict)
+                    event_logger.log_action_plan(plan_dict)
+                    
+                    # Cache the result (if available)
+                    if CACHE_AVAILABLE and cache_manager:
+                        cache_manager.set_ui_schema(image_hash, intent, ui_schema_dict, ttl=3600)
+                except Exception as e:
+                    duration = time.time() - start_time
+                    track_llm_api_call("gemini", "gemini-1.5-pro", duration, False)
+                    track_vision_analysis(False)
+                    raise
                 
                 logger.info(f"Combined analysis completed: {len(ui_schema.elements)} elements, {len(plan.steps)} steps (1 API call instead of 2)", context={"elements": len(ui_schema.elements), "steps": len(plan.steps), "optimization": "combined"})
                 
@@ -546,6 +576,8 @@ async def analyze_and_execute(
         if not used_combined:
             # Step 1: Vision - Understand UI (with circuit breaker protection if available)
             try:
+                import time
+                start_time = time.time()
                 # Wrap synchronous call for circuit breaker
                 def analyze_image_sync():
                     return vision_engine.analyze_image(image_data)
@@ -555,6 +587,14 @@ async def analyze_and_execute(
                     ui_schema = openai_circuit_breaker.call(analyze_image_sync)
                 else:
                     ui_schema = analyze_image_sync()
+                duration = time.time() - start_time
+                
+                # Track LLM API call and vision analysis
+                provider = "gemini" if hasattr(vision_engine, 'model') and "gemini" in str(type(vision_engine)).lower() else "openai"
+                model = "gemini-1.5-pro" if provider == "gemini" else "gpt-4o"
+                track_llm_api_call(provider, model, duration, True)
+                track_vision_analysis(True)
+                
                 ui_schema_dict = ui_schema.model_dump()
                 event_logger.log_ui_schema(ui_schema_dict)
                 
@@ -566,6 +606,11 @@ async def analyze_and_execute(
                 logger.info(f"Vision analysis completed: {len(ui_schema.elements)} elements found", context={"elements_count": len(ui_schema.elements)})
 
             except Exception as e:
+                duration = time.time() - start_time if 'start_time' in locals() else 0
+                provider = "gemini" if hasattr(vision_engine, 'model') and "gemini" in str(type(vision_engine)).lower() else "openai"
+                model = "gemini-1.5-pro" if provider == "gemini" else "gpt-4o"
+                track_llm_api_call(provider, model, duration, False)
+                track_vision_analysis(False)
                 logger.error(f"Vision analysis error: {str(e)}", exception=e, context={"endpoint": "analyze-and-execute", "step": "vision"})
                 raise HTTPException(
                     status_code=500, 
@@ -728,14 +773,23 @@ async def analyze_and_execute(
                     }
                 )
             
-            result = await executor.execute_plan(
-                steps=plan.steps,
-                ui_schema=ui_schema_dict,
-                start_url=start_url
-            )
-            
-            result_dict = result.model_dump()
-            event_logger.log_execution_result(result_dict)
+            import time
+            exec_start_time = time.time()
+            try:
+                result = await executor.execute_plan(
+                    steps=plan.steps,
+                    ui_schema=ui_schema_dict,
+                    start_url=start_url
+                )
+                exec_duration = time.time() - exec_start_time
+                track_browser_execution(True, exec_duration)
+                
+                result_dict = result.model_dump()
+                event_logger.log_execution_result(result_dict)
+            except Exception as e:
+                exec_duration = time.time() - exec_start_time
+                track_browser_execution(False, exec_duration)
+                raise
             
             return JSONResponse(
                 status_code=200,
