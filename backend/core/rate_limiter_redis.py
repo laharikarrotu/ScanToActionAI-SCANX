@@ -3,7 +3,7 @@ Redis-based rate limiter for distributed rate limiting
 Works across multiple backend instances
 """
 try:
-    import redis
+    import redis  # type: ignore[reportMissingImports]
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False

@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from pdf2image import convert_from_bytes
+    from pdf2image import convert_from_bytes  # type: ignore[reportMissingImports]
     PDF2IMAGE_AVAILABLE = True
 except ImportError:
     PDF2IMAGE_AVAILABLE = False
@@ -96,7 +96,7 @@ class PDFProcessor:
             images = convert_from_bytes(pdf_data, first_page=1, last_page=1)
             # This is a workaround - we convert first page to get count
             # In production, use PyPDF2 for faster page counting
-            from pdf2image import pdfinfo_from_bytes
+            from pdf2image import pdfinfo_from_bytes  # type: ignore[reportMissingImports]
             info = pdfinfo_from_bytes(pdf_data)
             return info.get('Pages', 1)
         except Exception as e:

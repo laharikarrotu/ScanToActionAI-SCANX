@@ -14,6 +14,11 @@ from .streaming import StreamingResponseBuilder
 from .logger import StructuredLogger, get_logger, LogLevel
 from .middleware import RequestLoggingMiddleware, PerformanceMiddleware
 from .pii_redaction import PIIRedactor
+from .monitoring import (
+    init_sentry, track_llm_api_call, track_vision_analysis,
+    track_prescription_extraction, track_browser_execution,
+    track_cache_hit, track_cache_miss, get_prometheus_metrics
+)
 
 __all__ = [
     "CacheManager",
@@ -40,6 +45,14 @@ __all__ = [
     "LogLevel",
     "RequestLoggingMiddleware",
     "PerformanceMiddleware",
-    "PIIRedactor"
+    "PIIRedactor",
+    "init_sentry",
+    "track_llm_api_call",
+    "track_vision_analysis",
+    "track_prescription_extraction",
+    "track_browser_execution",
+    "track_cache_hit",
+    "track_cache_miss",
+    "get_prometheus_metrics"
 ]
 

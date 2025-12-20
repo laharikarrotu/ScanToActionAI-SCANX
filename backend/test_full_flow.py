@@ -12,7 +12,7 @@ import subprocess
 
 # Optional: psutil for process counting (install with: pip install psutil)
 try:
-    import psutil
+    import psutil  # type: ignore[reportMissingModuleSource]
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False

@@ -12,11 +12,13 @@ export type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, S
 export async function analyzeAndExecute(
   imageFile: File,
   intent: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
+  verifyOnly: boolean = false  // HITL: Request verification step
 ): Promise<AnalyzeResponse> {
   const formData = new FormData();
   formData.append('file', imageFile);
   formData.append('intent', intent);
+  formData.append('verify_only', verifyOnly.toString());
   if (context) {
     formData.append('context', JSON.stringify(context));
   }
@@ -43,6 +45,43 @@ export async function analyzeAndExecute(
   // Check if result has error status
   if (result.status === 'error') {
     throw new Error(result.message || 'An error occurred while processing');
+  }
+  
+  return result;
+}
+
+export async function executeVerifiedPlan(
+  verifiedPlan: Record<string, unknown>,
+  verifiedData: Record<string, unknown>,
+  uiSchema: Record<string, unknown>,
+  startUrl: string
+): Promise<AnalyzeResponse> {
+  const formData = new FormData();
+  formData.append('verified_plan', JSON.stringify(verifiedPlan));
+  formData.append('verified_data', JSON.stringify(verifiedData));
+  formData.append('ui_schema', JSON.stringify(uiSchema));
+  formData.append('start_url', startUrl);
+
+  const response = await fetch(`${API_BASE_URL}/execute-verified-plan`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to execute verified plan';
+    try {
+      const error = await response.json();
+      errorMessage = error.detail || error.message || errorMessage;
+    } catch (e) {
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const result = await response.json();
+  
+  if (result.status === 'error') {
+    throw new Error(result.message || 'An error occurred during execution');
   }
   
   return result;

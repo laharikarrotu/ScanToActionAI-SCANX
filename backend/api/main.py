@@ -25,6 +25,11 @@ from core.streaming import StreamingResponseBuilder
 from core.logger import get_logger
 from core.middleware import RequestLoggingMiddleware, PerformanceMiddleware
 from core.pii_redaction import PIIRedactor
+from core.monitoring import (
+    init_sentry, track_llm_api_call, track_vision_analysis,
+    track_prescription_extraction, track_browser_execution,
+    track_cache_hit, track_cache_miss, get_prometheus_metrics
+)
 from api.config import settings
 from api.auth import create_access_token, verify_token
 from medication.prescription_extractor import PrescriptionExtractor, PrescriptionInfo
@@ -145,6 +150,9 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(PerformanceMiddleware)
 
+# Initialize logging FIRST (before any logger usage)
+logger = get_logger("api.main")
+
 # Initialize engines - Use combined analyzer if Gemini available, otherwise separate engines
 USE_COMBINED_ANALYZER = False
 combined_analyzer = None
@@ -177,9 +185,6 @@ except Exception as e:
     USE_COMBINED_ANALYZER = False
     vision_engine = VisionEngine(api_key=settings.openai_api_key)
     planner_engine = PlannerEngine(api_key=settings.openai_api_key)
-
-# Initialize logging
-logger = get_logger("api.main")
 
 event_logger = EventLogger()
 error_handler = ErrorHandler(max_retries=3, retry_delay=1.0)
@@ -390,10 +395,14 @@ async def analyze_and_execute(
     request: Request,
     file: UploadFile = File(...),
     intent: str = Form(...),
-    context: Optional[str] = Form(None)
+    context: Optional[str] = Form(None),
+    verify_only: bool = Form(False)  # HITL: Return plan for user verification before execution
 ):
     """
     Main endpoint: Takes image + intent, analyzes, plans, and executes
+    
+    **Parameters:**
+    - `verify_only`: If True, returns plan for user verification (HITL) without executing
     """
     # Rate limiting
     client_ip = request.client.host if request.client else "unknown"
@@ -633,6 +642,28 @@ async def analyze_and_execute(
                     "plan": plan_dict,
                     "extracted_data": extracted_data,
                     "message": f"Successfully extracted {len(extracted_data)} data points from the document. No browser execution needed for read-only operations."
+                }
+            )
+        
+        # HITL: If verify_only is True, return plan for user verification before execution
+        if verify_only:
+            extracted_data = {}
+            for elem in ui_schema.elements:
+                extracted_data[elem.id] = {
+                    "type": elem.type,
+                    "label": elem.label,
+                    "value": elem.value or None,
+                    "position": elem.position
+                }
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "verification_required",
+                    "ui_schema": ui_schema_dict,
+                    "plan": plan_dict,
+                    "extracted_data": extracted_data,
+                    "message": "Please verify and edit the extracted data before execution. This helps ensure 100% accuracy for medical forms."
                 }
             )
         
@@ -1109,3 +1140,74 @@ async def generate_meal_plan(
             }
         )
 
+
+@app.post("/execute-verified-plan")
+async def execute_verified_plan_endpoint(
+    request: Request,
+    verified_plan: str = Form(...),
+    verified_data: str = Form(...),
+    ui_schema: str = Form(...),
+    start_url: str = Form(...)
+):
+    """HITL: Execute a plan after user verification and editing."""
+    try:
+        from api.execute_verified import execute_verified_plan
+        import json
+        
+        plan_dict = json.loads(verified_plan)
+        data_dict = json.loads(verified_data)
+        schema_dict = json.loads(ui_schema)
+        
+        result = await execute_verified_plan(
+            verified_plan=plan_dict,
+            verified_data=data_dict,
+            ui_schema=schema_dict,
+            start_url=start_url
+        )
+        
+        result_dict = result.model_dump()
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": result.status,
+                "message": result.message,
+                "execution": result_dict,
+                "verified": True
+            }
+        )
+    except Exception as e:
+        ErrorHandler.log_error(e, {"endpoint": "execute-verified-plan"})
+        user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": user_friendly_msg
+            }
+        )
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus metrics endpoint for monitoring."""
+    from fastapi.responses import Response
+    from core.monitoring import get_prometheus_metrics
+    
+    try:
+        metrics_data = get_prometheus_metrics()
+        try:
+            from prometheus_client import CONTENT_TYPE_LATEST  # type: ignore[reportMissingImports]
+            content_type = CONTENT_TYPE_LATEST
+        except ImportError:
+            content_type = "text/plain; version=0.0.4; charset=utf-8"
+        
+        return Response(
+            content=metrics_data,
+            media_type=content_type
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate Prometheus metrics: {e}")
+        return Response(
+            content=b"# Prometheus metrics unavailable\n",
+            media_type="text/plain"
+        )

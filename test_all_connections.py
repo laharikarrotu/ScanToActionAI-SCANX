@@ -118,8 +118,9 @@ def test_database_connection():
     print("\n🔍 Testing Database Connection...")
     
     try:
-        from api.config import settings
-        from memory.database import engine, Base, SessionLocal
+        # Backend directory is already added to sys.path at the top of the file
+        from api.config import settings  # type: ignore[reportMissingImports]
+        from memory.database import engine, Base, SessionLocal  # type: ignore[reportMissingImports]
         
         if settings.database_url:
             # Try to create a session

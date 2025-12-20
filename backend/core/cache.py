@@ -2,7 +2,7 @@
 Redis-based caching layer for scalable result storage
 """
 try:
-    import redis
+    import redis  # type: ignore[reportMissingImports]
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False

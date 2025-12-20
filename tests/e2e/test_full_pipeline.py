@@ -7,7 +7,7 @@ Tests the complete "See-Think-Act" pipeline:
 3. Execution: Browser automation
 4. Integration: Prescription extraction, interactions, diet recommendations
 """
-import pytest
+import pytest  # type: ignore[reportMissingImports]
 import asyncio
 import os
 import sys
@@ -18,12 +18,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
 
 from playwright.async_api import async_playwright, Page, Browser
-from vision.ui_detector import VisionEngine, UISchema
-from planner.agent_planner import PlannerEngine, ActionPlan
-from executor.browser_executor import BrowserExecutor, ExecutionResult
-from medication.prescription_extractor import PrescriptionExtractor
-from medication.interaction_checker import InteractionChecker, Medication
-from nutrition.diet_advisor import DietAdvisor
+from vision.ui_detector import VisionEngine, UISchema  # type: ignore[reportMissingImports]
+from planner.agent_planner import PlannerEngine, ActionPlan  # type: ignore[reportMissingImports]
+from executor.browser_executor import BrowserExecutor, ExecutionResult  # type: ignore[reportMissingImports]
+from medication.prescription_extractor import PrescriptionExtractor  # type: ignore[reportMissingImports]
+from medication.interaction_checker import InteractionChecker, Medication  # type: ignore[reportMissingImports]
+from nutrition.diet_advisor import DietAdvisor  # type: ignore[reportMissingImports]
 
 # Test configuration
 TEST_IMAGES_DIR = Path(__file__).parent / "test_images"
@@ -297,7 +297,7 @@ class TestAPIEndpoints:
 @pytest.mark.asyncio
 async def test_browser_memory_leak():
     """Test that browser executor doesn't leak memory"""
-    import psutil
+    import psutil  # type: ignore[reportMissingModuleSource]
     import os
     
     process = psutil.Process(os.getpid())

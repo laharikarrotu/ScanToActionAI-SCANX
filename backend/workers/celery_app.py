@@ -1,7 +1,7 @@
 """
 Celery Application Configuration
 """
-from celery import Celery
+from celery import Celery  # type: ignore[reportMissingImports]
 import os
 
 # Get Redis URL from environment (fallback to localhost for development)

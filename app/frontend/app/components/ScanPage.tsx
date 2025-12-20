@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { analyzeAndExecute, extractPrescription } from '../lib/api';
+import { analyzeAndExecute, extractPrescription, executeVerifiedPlan } from '../lib/api';
 import type { AnalyzeResponse, ActionStep, UIElement, Medication } from '../lib/types';
 import ProgressIndicator from './ProgressIndicator';
 import ProgressTracker from './ProgressTracker';
+import DataVerification from './DataVerification';
 import { useHealthScan } from '../context/HealthScanContext';
 
 export default function ScanPage() {
@@ -29,6 +30,8 @@ export default function ScanPage() {
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationData, setVerificationData] = useState<{ data: Record<string, UIElement>, plan: { task: string; steps: ActionStep[] }, uiSchema: Record<string, unknown> } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -160,7 +163,26 @@ export default function ScanPage() {
           return;
         }
         setProgressStep(1); // Analyzing image
-        const response = await analyzeAndExecute(image, intent);
+        
+        // HITL: Request verification step for medical forms
+        const needsVerification = intent.toLowerCase().includes('form') || 
+                                  intent.toLowerCase().includes('fill') ||
+                                  intent.toLowerCase().includes('submit');
+        
+        const response = await analyzeAndExecute(image, intent, undefined, needsVerification);
+        
+        // Check if verification is required (HITL)
+        if (response.status === 'verification_required') {
+          setVerificationData({
+            data: (response.extracted_data || {}) as Record<string, UIElement>,
+            plan: (response.plan || { task: '', steps: [] }) as { task: string; steps: ActionStep[] },
+            uiSchema: (response.ui_schema || {}) as Record<string, unknown>
+          });
+          setShowVerification(true);
+          setLoading(false);
+          return;
+        }
+        
         setProgressStep(2); // Planning
         setProgressStep(3); // Executing
         setResult(response);
@@ -195,9 +217,58 @@ export default function ScanPage() {
     setProgressMessage('');
     setProgressPercent(0);
     setProgressStep(0);
+    setShowVerification(false);
+    setVerificationData(null);
     clearErrors();
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
+  const handleVerificationConfirm = async (verifiedData: Record<string, UIElement>, verifiedPlan: { task: string; steps: ActionStep[] }) => {
+    if (!verificationData || !image) return;
+    
+    setLoading(true);
+    setShowVerification(false);
+    setProgressStep(3); // Executing verified plan
+    
+    try {
+      const startUrl = (verificationData.uiSchema as { url_hint?: string }).url_hint || 'https://example.com';
+      
+      // Convert UIElement objects to plain objects for JSON serialization
+      const verifiedDataPlain: Record<string, Record<string, unknown>> = {};
+      for (const [key, value] of Object.entries(verifiedData.data)) {
+        verifiedDataPlain[key] = {
+          id: value.id,
+          type: value.type,
+          label: value.label,
+          value: value.value,
+          position: value.position
+        };
+      }
+      
+      const response = await executeVerifiedPlan(
+        verifiedPlan,
+        verifiedDataPlain,
+        verificationData.uiSchema,
+        startUrl
+      );
+      
+      setResult(response);
+      setProgressStep(4); // Complete
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Execution failed';
+      setLocalError(errorMsg);
+      setError('scan', errorMsg);
+      setProgressStep(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerificationCancel = () => {
+    setShowVerification(false);
+    setVerificationData(null);
+    setLoading(false);
   };
 
   // Set current step on mount
@@ -206,7 +277,16 @@ export default function ScanPage() {
   }, [setCurrentStep]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4 pb-8">
+    <>
+      {showVerification && verificationData && (
+        <DataVerification
+          extractedData={verificationData.data}
+          actionPlan={verificationData.plan}
+          onConfirm={handleVerificationConfirm}
+          onCancel={handleVerificationCancel}
+        />
+      )}
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4 pb-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 md:mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">HealthScan</h1>
@@ -545,6 +625,7 @@ export default function ScanPage() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

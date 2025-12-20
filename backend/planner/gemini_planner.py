@@ -122,9 +122,9 @@ CRITICAL: Return at least 2-5 steps. Use element IDs exactly as shown above."""
             steps = []
             try:
                 steps = [ActionStep(**step) for step in result_dict.get("steps", [])]
-                except Exception as e:
-                    import logging
-                    logging.debug(f"Failed to parse action step: {e}")
+            except Exception as e:
+                import logging
+                logging.debug(f"Failed to parse action step: {e}")
             
             # Fallback: Create steps from elements
             if not steps and ui_schema.get("elements"):
