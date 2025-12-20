@@ -13,6 +13,7 @@ from .audit_logger import AuditLogger, AuditAction
 from .streaming import StreamingResponseBuilder
 from .logger import StructuredLogger, get_logger, LogLevel
 from .middleware import RequestLoggingMiddleware, PerformanceMiddleware
+from .pii_redaction import PIIRedactor
 
 __all__ = [
     "CacheManager",
@@ -38,6 +39,7 @@ __all__ = [
     "get_logger",
     "LogLevel",
     "RequestLoggingMiddleware",
-    "PerformanceMiddleware"
+    "PerformanceMiddleware",
+    "PIIRedactor"
 ]
 

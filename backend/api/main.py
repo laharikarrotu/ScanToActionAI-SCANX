@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from vision.ui_detector import VisionEngine, UISchema
 from vision.image_quality import ImageQualityChecker
+from vision.pdf_processor import PDFProcessor
 from planner.agent_planner import PlannerEngine, ActionPlan
 from executor.browser_executor import BrowserExecutor, ExecutionResult
 from memory.event_log import EventLogger
@@ -23,6 +24,7 @@ from core.audit_logger import AuditLogger, AuditAction
 from core.streaming import StreamingResponseBuilder
 from core.logger import get_logger
 from core.middleware import RequestLoggingMiddleware, PerformanceMiddleware
+from core.pii_redaction import PIIRedactor
 from api.config import settings
 from api.auth import create_access_token, verify_token
 from medication.prescription_extractor import PrescriptionExtractor, PrescriptionInfo
@@ -34,6 +36,19 @@ from fastapi import Depends
 from api.rate_limiter import RateLimiter
 from fastapi import Request
 import hashlib
+import base64
+
+# Optional Celery support for background tasks
+try:
+    from workers.celery_app import celery_app
+    from workers.tasks import execute_browser_automation, extract_prescription_async, check_interactions_async
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    celery_app = None
+    execute_browser_automation = None
+    extract_prescription_async = None
+    check_interactions_async = None
 
 # Optional scalability modules (graceful fallback if not available)
 try:
@@ -169,13 +184,15 @@ logger = get_logger("api.main")
 event_logger = EventLogger()
 error_handler = ErrorHandler(max_retries=3, retry_delay=1.0)
 resource_manager = ResourceManager(default_timeout=30.0)
-# HIPAA Compliance: Image encryption and audit logging
+# HIPAA Compliance: Image encryption, audit logging, and PII redaction
 image_encryption = ImageEncryption()
 audit_logger = AuditLogger()
+pii_redactor = PIIRedactor(redaction_mode="blur")  # Automatically redact PII before sending to LLMs
 
 logger.info("Initializing HealthScan API", context={"version": "1.0.0"})
 prescription_extractor = PrescriptionExtractor(api_key=settings.openai_api_key)
 interaction_checker = InteractionChecker()
+pdf_processor = PDFProcessor()  # Multi-page PDF support
 # Force Gemini for diet advisor if available (cheaper and avoids OpenAI quota issues)
 diet_advisor = DietAdvisor(api_key=settings.openai_api_key, use_gemini=bool(settings.gemini_api_key))
 if settings.gemini_api_key:
@@ -285,8 +302,29 @@ async def extract_prescription_direct(
     - Images can be encrypted at rest (configurable)
     """
     try:
-        # Read image
-        image_data = await file.read()
+        # Read file data
+        file_data = await file.read()
+        
+        # Check if it's a PDF
+        if pdf_processor.is_pdf(file_data):
+            # Convert PDF to images (process first page by default, or all pages)
+            try:
+                pdf_images = pdf_processor.pdf_to_images(file_data)
+                if not pdf_images:
+                    raise HTTPException(status_code=400, detail="PDF conversion failed or PDF is empty")
+                
+                # Process first page (or all pages - for now, just first page)
+                image_data = pdf_images[0]
+                logger.info(f"PDF detected: {len(pdf_images)} pages, processing first page")
+                
+                # If multiple pages, log warning
+                if len(pdf_images) > 1:
+                    logger.warning(f"PDF has {len(pdf_images)} pages. Only processing first page. Consider using multi-page endpoint.")
+            except Exception as e:
+                logger.error(f"PDF processing failed: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"PDF processing failed: {str(e)}")
+        else:
+            image_data = file_data
         
         # HIPAA Compliance: Log image upload
         client_ip = request.client.host if request.client else "unknown"
@@ -374,20 +412,39 @@ async def analyze_and_execute(
         if len(intent) > 500:
             raise HTTPException(status_code=400, detail="Intent is too long (max 500 characters)")
         
-        # Read and validate image
-        image_data = await file.read()
+        # Read and validate file
+        file_data = await file.read()
+        
+        # Check if it's a PDF
+        if pdf_processor.is_pdf(file_data):
+            # Convert PDF to images (process first page)
+            try:
+                pdf_images = pdf_processor.pdf_to_images(file_data)
+                if not pdf_images:
+                    raise HTTPException(status_code=400, detail="PDF conversion failed")
+                image_data = pdf_images[0]
+                logger.info(f"PDF detected: {len(pdf_images)} pages, processing first page")
+            except Exception as e:
+                logger.error(f"PDF processing failed: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"PDF processing failed: {str(e)}")
+        else:
+            image_data = file_data
         
         # HIPAA Compliance: Log image upload
         image_hash = hashlib.md5(image_data).hexdigest()
         audit_logger.log_image_upload(user_id=None, image_hash=image_hash, ip_address=client_ip)
         
         # Check file size (max 10MB)
-        if len(image_data) > 10 * 1024 * 1024:
+        if len(file_data) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Image is too large (max 10MB)")
         
-        # Check file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
+        # Check file type (allow images and PDFs)
+        if not file.content_type:
+            # Try to detect from content
+            if not pdf_processor.is_pdf(file_data) and not file_data.startswith(b'\xff\xd8'):  # JPEG magic bytes
+                raise HTTPException(status_code=400, detail="File must be an image or PDF")
+        elif not (file.content_type.startswith('image/') or file.content_type == 'application/pdf'):
+            raise HTTPException(status_code=400, detail="File must be an image or PDF")
         
         # Check image quality (blur, resolution, brightness)
         quality_checker = ImageQualityChecker()

@@ -16,6 +16,7 @@ class UIElement(BaseModel):
     label: str
     value: Optional[str] = None
     position: Optional[Dict[str, int]] = None
+    confidence: Optional[float] = None  # 0.0 to 1.0, higher = more confident
 
 class UISchema(BaseModel):
     page_type: str

@@ -7,9 +7,34 @@ import io
 import cv2
 import numpy as np
 from typing import Optional, Dict, List
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from core.pii_redaction import PIIRedactor
+    PII_REDACTION_AVAILABLE = True
+except ImportError:
+    PII_REDACTION_AVAILABLE = False
+    PIIRedactor = None
 
 class OCRPreprocessor:
     """Preprocesses images and extracts text using OCR"""
+    
+    def __init__(self, enable_pii_redaction: bool = True):
+        """
+        Initialize OCR Preprocessor.
+        
+        Args:
+            enable_pii_redaction: If True, automatically redact PII from extracted text
+        """
+        self.enable_pii_redaction = enable_pii_redaction and PII_REDACTION_AVAILABLE
+        if self.enable_pii_redaction:
+            self.pii_redactor = PIIRedactor(redaction_mode="blur")
+        else:
+            self.pii_redactor = None
     
     @staticmethod
     def preprocess_image(image_data: bytes) -> bytes:
@@ -72,8 +97,7 @@ class OCRPreprocessor:
             logging.warning(f"Image preprocessing failed: {str(e)}, using original image")
             return image_data
     
-    @staticmethod
-    def extract_text(image_data: bytes, preprocess: bool = True) -> Dict[str, any]:
+    def extract_text(self, image_data: bytes, preprocess: bool = True) -> Dict[str, any]:
         """
         Extract text from image using OCR
         
@@ -133,11 +157,27 @@ class OCRPreprocessor:
             # Count words
             word_count = len([w for line in text_lines for w, _ in line])
             
+            # Redact PII if enabled
+            redacted_text = full_text
+            pii_count = 0
+            pii_summary = {}
+            if self.enable_pii_redaction and self.pii_redactor:
+                redacted_text, pii_count = self.pii_redactor.redact_text(full_text)
+                if pii_count > 0:
+                    pii_summary = self.pii_redactor.get_redaction_summary()
+                    import logging
+                    logging.warning(f"PII detected and redacted: {pii_count} instances", 
+                                  context={"pii_summary": pii_summary})
+            
             return {
-                "text": full_text,
+                "text": redacted_text,
+                "original_text": full_text if self.enable_pii_redaction else None,  # Keep original for internal use only
                 "confidence": avg_confidence,
                 "word_count": word_count,
-                "lines": [' '.join([w[0] for w in line]) for line in text_lines]
+                "lines": [' '.join([w[0] for w in line]) for line in text_lines],
+                "pii_detected": pii_count > 0,
+                "pii_count": pii_count,
+                "pii_summary": pii_summary
             }
             
         except Exception as e:
@@ -145,8 +185,12 @@ class OCRPreprocessor:
             logging.error(f"OCR extraction failed: {str(e)}")
             return {
                 "text": "",
+                "original_text": None,
                 "confidence": 0.0,
                 "word_count": 0,
-                "lines": []
+                "lines": [],
+                "pii_detected": False,
+                "pii_count": 0,
+                "pii_summary": {}
             }
 

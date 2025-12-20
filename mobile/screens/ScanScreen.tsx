@@ -13,12 +13,18 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { analyzeAndExecute } from '../lib/api';
 
+import { checkImageQualityWithBackend } from '../lib/imageQuality';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function ScanScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [intent, setIntent] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qualityCheck, setQualityCheck] = useState<any>(null);
+  const [checkingQuality, setCheckingQuality] = useState(false);
 
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -40,9 +46,14 @@ export default function ScanScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+      setImage(imageUri);
       setError(null);
       setResult(null);
+      setQualityCheck(null);
+      
+      // Check image quality in real-time
+      await checkImageQualityRealTime(imageUri);
     }
   };
 
@@ -54,9 +65,42 @@ export default function ScanScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImage(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+      setImage(imageUri);
       setError(null);
       setResult(null);
+      setQualityCheck(null);
+      
+      // Check image quality in real-time
+      await checkImageQualityRealTime(imageUri);
+    }
+  };
+
+  const checkImageQualityRealTime = async (imageUri: string) => {
+    setCheckingQuality(true);
+    try {
+      const qualityResult = await checkImageQualityWithBackend(imageUri, API_BASE_URL);
+      setQualityCheck(qualityResult);
+      
+      // Show alert if quality is too low
+      if (!qualityResult.isValid && qualityResult.issues.length > 0) {
+        Alert.alert(
+          'Image Quality Issue',
+          qualityResult.issues.join('\n') + '\n\n' + qualityResult.recommendations.join('\n'),
+          [{ text: 'OK' }]
+        );
+      } else if (qualityResult.warnings.length > 0) {
+        Alert.alert(
+          'Image Quality Warning',
+          qualityResult.warnings.join('\n') + '\n\n' + qualityResult.recommendations.join('\n'),
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err) {
+      // Silently fail - quality check is optional
+      console.warn('Quality check failed:', err);
+    } finally {
+      setCheckingQuality(false);
     }
   };
 
@@ -86,6 +130,7 @@ export default function ScanScreen() {
     setIntent('');
     setResult(null);
     setError(null);
+    setQualityCheck(null);
   };
 
   return (
@@ -101,6 +146,51 @@ export default function ScanScreen() {
         {image ? (
           <View style={styles.imageContainer}>
             <Image source={{ uri: image }} style={styles.image} />
+            
+            {/* Quality Feedback */}
+            {checkingQuality && (
+              <View style={styles.qualityChecking}>
+                <ActivityIndicator size="small" color="#00ff88" />
+                <Text style={styles.qualityCheckingText}>Checking image quality...</Text>
+              </View>
+            )}
+            
+            {qualityCheck && !checkingQuality && (
+              <View style={[
+                styles.qualityBadge,
+                qualityCheck.isValid && qualityCheck.score >= 80 && styles.qualityGood,
+                !qualityCheck.isValid && styles.qualityBad,
+                qualityCheck.isValid && qualityCheck.score < 80 && styles.qualityWarning
+              ]}>
+                <Text style={styles.qualityBadgeText}>
+                  {qualityCheck.isValid && qualityCheck.score >= 80 && '✓ Good Quality'}
+                  {qualityCheck.isValid && qualityCheck.score < 80 && '⚠ Acceptable'}
+                  {!qualityCheck.isValid && '✗ Quality Issues'}
+                </Text>
+                {qualityCheck.score < 100 && (
+                  <Text style={styles.qualityScore}>Score: {qualityCheck.score}/100</Text>
+                )}
+              </View>
+            )}
+            
+            {qualityCheck && qualityCheck.warnings.length > 0 && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>⚠ Warnings:</Text>
+                {qualityCheck.warnings.map((warning: string, idx: number) => (
+                  <Text key={idx} style={styles.warningText}>• {warning}</Text>
+                ))}
+              </View>
+            )}
+            
+            {qualityCheck && qualityCheck.recommendations.length > 0 && qualityCheck.score < 80 && (
+              <View style={styles.recommendationsBox}>
+                <Text style={styles.recommendationsTitle}>💡 Tips:</Text>
+                {qualityCheck.recommendations.map((rec: string, idx: number) => (
+                  <Text key={idx} style={styles.recommendationsText}>• {rec}</Text>
+                ))}
+              </View>
+            )}
+            
             <TouchableOpacity onPress={handleReset} style={styles.changeButton}>
               <Text style={styles.changeButtonText}>Change image</Text>
             </TouchableOpacity>
@@ -134,8 +224,11 @@ export default function ScanScreen() {
       {/* Submit Button */}
       <TouchableOpacity
         onPress={handleSubmit}
-        disabled={loading || !image || !intent.trim()}
-        style={[styles.submitButton, (!image || !intent.trim()) && styles.submitButtonDisabled]}
+        disabled={loading || !image || !intent.trim() || (qualityCheck && !qualityCheck.isValid)}
+        style={[
+          styles.submitButton, 
+          (!image || !intent.trim() || (qualityCheck && !qualityCheck.isValid)) && styles.submitButtonDisabled
+        ]}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
@@ -501,6 +594,79 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  qualityChecking: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    backgroundColor: '#1a3a1a',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  qualityCheckingText: {
+    color: '#00ff88',
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  qualityBadge: {
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  qualityGood: {
+    backgroundColor: '#0a4d0a',
+  },
+  qualityWarning: {
+    backgroundColor: '#4a4a00',
+  },
+  qualityBad: {
+    backgroundColor: '#4a0000',
+  },
+  qualityBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  qualityScore: {
+    color: '#999',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  warningBox: {
+    backgroundColor: '#4a4a00',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  warningTitle: {
+    color: '#ffaa00',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  warningText: {
+    color: '#ffcc88',
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  recommendationsBox: {
+    backgroundColor: '#1a3a3a',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  recommendationsTitle: {
+    color: '#00ccff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recommendationsText: {
+    color: '#88ccff',
+    fontSize: 12,
+    marginLeft: 8,
   },
 });
 
