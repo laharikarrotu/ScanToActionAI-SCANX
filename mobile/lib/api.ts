@@ -5,6 +5,11 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
+/**
+ * API client for HealthScan mobile app
+ * Connects to the same FastAPI backend as the web app
+ */
+
 export interface AnalyzeResponse {
   status: string;
   ui_schema?: any;
@@ -41,18 +46,19 @@ export async function analyzeAndExecute(
   return response.data;
 }
 
-export async function analyzeOnly(imageUri: string, hint?: string): Promise<any> {
+/**
+ * Extract prescription from image (fast mode)
+ * Uses /extract-prescription endpoint for direct extraction
+ */
+export async function extractPrescription(imageUri: string): Promise<any> {
   const formData = new FormData();
   formData.append('file', {
     uri: imageUri,
     type: 'image/jpeg',
     name: 'photo.jpg',
   } as any);
-  if (hint) {
-    formData.append('hint', hint);
-  }
 
-  const response = await axios.post(`${API_BASE_URL}/analyze`, formData, {
+  const response = await axios.post(`${API_BASE_URL}/extract-prescription`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
