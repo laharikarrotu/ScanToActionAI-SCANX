@@ -1,5 +1,5 @@
-import ScanPage from "./components/ScanPage";
+import ChatAgent from "./components/ChatAgent";
 
 export default function Home() {
-  return <ScanPage />;
+  return <ChatAgent />;
 }

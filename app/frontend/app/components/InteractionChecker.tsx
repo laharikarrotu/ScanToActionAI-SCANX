@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import type { InteractionCheckResponse, InteractionWarning, PrescriptionDetail } from '../lib/types';
 import ProgressTracker from './ProgressTracker';
 import { useHealthScan } from '../context/HealthScanContext';
+import { API_BASE_URL } from '../lib/api';
+import MedicalDisclaimer from './MedicalDisclaimer';
 
 export default function InteractionChecker() {
   const router = useRouter();
@@ -79,7 +81,6 @@ export default function InteractionChecker() {
         formData.append('allergies', allergies);
       }
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE_URL}/check-prescription-interactions`, {
         method: 'POST',
         body: formData,
@@ -126,29 +127,38 @@ export default function InteractionChecker() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen text-slate-800 relative overflow-hidden">
+      {/* Medical Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,132,199,0.05),transparent_50%)]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(6,182,212,0.05),transparent_50%)]"></div>
+      </div>
+
+      <div className="relative max-w-5xl mx-auto p-4 md:p-6 z-10">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold mb-2">💊 Drug Interaction Checker</h1>
-          <p className="text-blue-300">HealthScan's unique feature - Check multiple prescriptions for interactions</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 mb-4 shadow-lg glow-teal medical-card">
+            <span className="text-3xl">💊</span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2 gradient-text">Drug Interaction Checker</h1>
+          <p className="text-slate-600 font-medium">HealthScan's unique feature - Check multiple prescriptions for interactions</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" aria-label="Drug interaction checker form">
           {/* Multi-Image Upload */}
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-xl font-semibold mb-4">1. Upload Prescription Images</h2>
+          <div className="medical-card p-6">
+            <h2 className="text-xl font-semibold mb-4 text-slate-800">1. Upload Prescription Images</h2>
             
             {imagePreviews.length > 0 ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {imagePreviews.map((preview, idx) => (
-                    <div key={idx} className="relative">
+                    <div key={idx} className="relative medical-card overflow-hidden">
                       <img
                         src={preview}
                         alt={`Prescription ${idx + 1}`}
-                        className="w-full h-auto rounded-lg border border-zinc-700"
+                        className="w-full h-auto"
                       />
-                      <span className="absolute top-2 left-2 bg-blue-600 px-2 py-1 rounded text-xs">
+                      <span className="absolute top-3 left-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg">
                         Prescription {idx + 1}
                       </span>
                     </div>
@@ -157,13 +167,14 @@ export default function InteractionChecker() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="text-sm text-blue-400 hover:text-white"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                  aria-label="Change prescription images"
                 >
                   Change images
                 </button>
               </div>
             ) : (
-              <label className="cursor-pointer">
+              <label className="cursor-pointer block">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -171,144 +182,189 @@ export default function InteractionChecker() {
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"
+                  aria-label="Upload prescription images"
                 />
-                <div className="border-2 border-dashed border-zinc-600 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
-                  <p className="text-zinc-400">Click to upload prescription images</p>
-                  <p className="text-sm text-zinc-500 mt-2">You can select multiple prescriptions</p>
+                <div className="border-2 border-dashed border-blue-300 rounded-xl p-8 md:p-12 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all medical-card">
+                  <div className="text-4xl mb-3">📋</div>
+                  <p className="text-slate-700 font-medium">Click to upload prescription images</p>
+                  <p className="text-sm text-slate-500 mt-2">You can select multiple prescriptions</p>
                 </div>
               </label>
             )}
           </div>
 
           {/* Allergies Input */}
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-xl font-semibold mb-4">2. Known Allergies (Optional)</h2>
+          <div className="medical-card p-6">
+            <h2 className="text-xl font-semibold mb-4 text-slate-800">2. Known Allergies (Optional)</h2>
             <input
               type="text"
               value={allergies}
               onChange={(e) => setAllergies(e.target.value)}
               placeholder="e.g., Penicillin, Aspirin, Ibuprofen (comma-separated)"
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+              className="w-full medical-card border border-blue-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
+              aria-label="Enter known allergies"
             />
+            <p className="text-xs text-slate-500 mt-2">This helps us check for drug-allergy interactions</p>
           </div>
 
           {/* Submit Button */}
           <button
             type="submit"
             disabled={loading || images.length === 0}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+            aria-label={loading ? "Checking interactions" : `Check ${images.length} prescription${images.length > 1 ? 's' : ''}`}
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Checking Interactions...
+                <div className="spinner w-5 h-5 border-2 border-white border-t-transparent"></div>
+                <span>Analyzing Interactions...</span>
               </>
             ) : (
-              `Check ${images.length} Prescription${images.length > 1 ? 's' : ''}`
+              <>
+                <span>🔍</span>
+                <span>Check {images.length} Prescription{images.length > 1 ? 's' : ''}</span>
+              </>
             )}
           </button>
 
           {(localError || errors.interactions) && (
-            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
-              <p>{localError || errors.interactions}</p>
-              {localError?.includes('Network') && (
-                <button
-                  onClick={handleSubmit}
-                  className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-800 rounded text-sm"
-                >
-                  🔄 Retry
-                </button>
-              )}
+            <div className="medical-card bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-red-800 font-semibold mb-1">Error</p>
+                  <p className="text-red-700 text-sm">{localError || errors.interactions}</p>
+                  {localError?.includes('Network') && (
+                    <button
+                      onClick={handleSubmit}
+                      className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      aria-label="Retry checking interactions"
+                    >
+                      🔄 Retry
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </form>
 
         {/* Results */}
         {result && (
-          <div className="mt-8 bg-zinc-800 rounded-lg p-6 border border-zinc-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Interaction Check Results</h2>
+          <div className="mt-8 medical-card p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-slate-800">Interaction Check Results</h2>
               {!result.has_interactions && (
-                <span className="px-3 py-1 bg-green-900/30 text-green-400 rounded-full text-sm font-medium">
+                <span className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full text-sm font-semibold shadow-lg glow-green">
                   ✓ Safe
                 </span>
               )}
             </div>
             
             <div className="space-y-4">
-              <div className="bg-zinc-900 p-4 rounded">
-                <p className="text-sm text-zinc-400 mb-2">Medications Found:</p>
-                <p className="text-blue-400 font-semibold">{result.medications_found}</p>
+              <div className="medical-card bg-blue-50 border-blue-200 p-4 rounded-xl">
+                <p className="text-sm text-slate-600 mb-2 font-medium">Medications Found:</p>
+                <p className="text-blue-700 font-bold text-lg">{result.medications_found}</p>
               </div>
 
               {result.has_interactions ? (
                 <div className="space-y-4">
                   {result.interactions.major.length > 0 && (
-                    <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
-                      <h3 className="text-red-400 font-semibold mb-2">⚠️ Major Interactions ({result.interactions.major.length})</h3>
+                    <div className="medical-card bg-red-50 border-2 border-red-300 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">🚨</span>
+                        <h3 className="text-red-700 font-bold text-lg">Major Interactions ({result.interactions.major.length})</h3>
+                      </div>
+                      <div className="bg-white/80 rounded-lg p-3 mb-3 border border-red-200">
+                        <p className="text-xs text-red-600 font-semibold uppercase tracking-wide mb-2">⚠️ URGENT: Consult Your Doctor Immediately</p>
+                        <p className="text-sm text-slate-600">These interactions require immediate medical attention before taking these medications together.</p>
+                      </div>
                       {result.interactions.major.map((interaction: InteractionWarning, idx: number) => (
-                        <div key={idx} className="mb-3 p-3 bg-red-900/20 rounded">
-                          <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
-                          <p className="text-sm mt-1">{interaction.description}</p>
-                          <p className="text-sm text-red-300 mt-2">💡 {interaction.recommendation}</p>
+                        <div key={idx} className="mb-4 p-4 bg-white rounded-lg border-l-4 border-red-500 shadow-sm">
+                          <p className="font-bold text-slate-800 mb-2">{interaction.medication1} + {interaction.medication2}</p>
+                          <p className="text-sm text-slate-700 mb-2">{interaction.description}</p>
+                          <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-sm text-blue-800 font-medium">💡 Recommendation: {interaction.recommendation}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
 
                   {result.interactions.moderate.length > 0 && (
-                    <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
-                      <h3 className="text-yellow-400 font-semibold mb-2">⚡ Moderate Interactions ({result.interactions.moderate.length})</h3>
+                    <div className="medical-card bg-yellow-50 border-2 border-yellow-300 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">⚡</span>
+                        <h3 className="text-yellow-700 font-bold text-lg">Moderate Interactions ({result.interactions.moderate.length})</h3>
+                      </div>
+                      <p className="text-sm text-slate-600 mb-3">Monitor closely and discuss with your healthcare provider.</p>
                       {result.interactions.moderate.map((interaction: InteractionWarning, idx: number) => (
-                        <div key={idx} className="mb-3 p-3 bg-yellow-900/20 rounded">
-                          <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
-                          <p className="text-sm mt-1">{interaction.description}</p>
-                          <p className="text-sm text-yellow-300 mt-2">💡 {interaction.recommendation}</p>
+                        <div key={idx} className="mb-4 p-4 bg-white rounded-lg border-l-4 border-yellow-500 shadow-sm">
+                          <p className="font-bold text-slate-800 mb-2">{interaction.medication1} + {interaction.medication2}</p>
+                          <p className="text-sm text-slate-700 mb-2">{interaction.description}</p>
+                          <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-sm text-blue-800 font-medium">💡 Recommendation: {interaction.recommendation}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
 
                   {result.interactions.minor.length > 0 && (
-                    <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                      <h3 className="text-blue-400 font-semibold mb-2">ℹ️ Minor Interactions ({result.interactions.minor.length})</h3>
+                    <div className="medical-card bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-2xl">ℹ️</span>
+                        <h3 className="text-blue-700 font-bold text-lg">Minor Interactions ({result.interactions.minor.length})</h3>
+                      </div>
+                      <p className="text-sm text-slate-600 mb-3">Generally safe, but monitor for any unusual symptoms.</p>
                       {result.interactions.minor.map((interaction: InteractionWarning, idx: number) => (
-                        <div key={idx} className="mb-3 p-3 bg-blue-900/20 rounded">
-                          <p className="font-semibold">{interaction.medication1} + {interaction.medication2}</p>
-                          <p className="text-sm mt-1">{interaction.description}</p>
+                        <div key={idx} className="mb-3 p-4 bg-white rounded-lg border-l-4 border-blue-500 shadow-sm">
+                          <p className="font-semibold text-slate-800 mb-1">{interaction.medication1} + {interaction.medication2}</p>
+                          <p className="text-sm text-slate-700">{interaction.description}</p>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                  <p className="text-green-400 font-semibold">✅ No interactions detected!</p>
-                  <p className="text-sm text-zinc-400 mt-2">Always consult your doctor or pharmacist for medical advice.</p>
+                <div className="medical-card bg-emerald-50 border-2 border-emerald-300 rounded-xl p-6 text-center">
+                  <div className="text-5xl mb-4">✅</div>
+                  <p className="text-emerald-700 font-bold text-lg mb-2">No interactions detected!</p>
+                  <p className="text-sm text-slate-600">Your medications appear safe to take together. However, always consult your doctor or pharmacist for final medical advice.</p>
                 </div>
               )}
+
+              {/* Medical Disclaimer */}
+              <div className="medical-card bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mt-6">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800 mb-1">Important Medical Disclaimer</p>
+                    <p className="text-xs text-amber-700">This tool is for informational purposes only and is not a replacement for professional medical advice. Always consult your healthcare provider before making any changes to your medications.</p>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleReset}
-                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 medical-card bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl transition-colors border border-slate-300"
+                  aria-label="Check another set of prescriptions"
                 >
                   Check Another Set
                 </button>
                 {result && result.warnings && (
                   <button
                     onClick={() => {
-                      // Extract medication names from result
                       const medNames = result.prescription_details?.map((p: PrescriptionDetail) => p.medication_name).filter(Boolean).join(', ') || '';
                       if (medNames) {
                         localStorage.setItem('current_medications', medNames);
                       }
+                      navigateToDiet();
                       router.push('/diet');
                     }}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    className="flex-1 btn-medical-success text-white font-semibold py-3 px-4 rounded-xl transition-all"
+                    aria-label="Get diet advice based on medications"
                   >
                     🥗 Get Diet Advice
                   </button>
@@ -317,6 +373,9 @@ export default function InteractionChecker() {
             </div>
           </div>
         )}
+
+        {/* Footer Medical Disclaimer */}
+        <MedicalDisclaimer variant="footer" className="mt-12" />
       </div>
     </div>
   );

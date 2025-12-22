@@ -34,7 +34,8 @@ class CombinedAnalyzer:
             raise ValueError("GEMINI_API_KEY required")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        from core.gemini_helper import get_gemini_model_with_fallback
+        self.model = get_gemini_model_with_fallback(api_key=self.api_key)
         self.ocr_preprocessor = OCRPreprocessor()
     
     def analyze_and_plan(
@@ -75,7 +76,7 @@ class CombinedAnalyzer:
                 generation_config={
                     "temperature": 0.1,  # Lower temperature for more consistent results
                     "max_output_tokens": 6000,  # More tokens for combined response
-                    "response_mime_type": "application/json"  # Force JSON output
+                    # response_mime_type removed - not supported in all API versions
                 }
             )
             

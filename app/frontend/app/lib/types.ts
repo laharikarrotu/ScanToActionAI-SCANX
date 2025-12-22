@@ -88,11 +88,12 @@ export interface PrescriptionDetail {
 export interface InteractionCheckResponse {
   status: string;
   message: string;
-  medications_found: string;
+  medications_found: number;  // Fixed: Backend returns int, not string
   has_interactions: boolean;
   interactions: InteractionWarnings;
-  warnings: InteractionWarnings;
-  prescription_details: PrescriptionDetail[];
+  warnings: InteractionWarnings;  // Alias for interactions (backend compatibility)
+  prescriptions?: PrescriptionDetail[];  // Backend primary field name
+  prescription_details: PrescriptionDetail[];  // Alias for prescriptions (backend compatibility)
 }
 
 // Diet Portal Types

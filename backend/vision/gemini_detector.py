@@ -29,7 +29,8 @@ class GeminiVisionEngine:
             raise ValueError("GEMINI_API_KEY required")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        from core.gemini_helper import get_gemini_model_with_fallback
+        self.model = get_gemini_model_with_fallback(api_key=self.api_key)
         self.ocr_preprocessor = OCRPreprocessor()
     
     def analyze_image(

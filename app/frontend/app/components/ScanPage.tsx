@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyzeAndExecute, extractPrescription, executeVerifiedPlan } from '../lib/api';
-import type { AnalyzeResponse, ActionStep, UIElement, Medication } from '../lib/types';
+import type { AnalyzeResponse, ActionStep, UIElement, Medication, ExtractPrescriptionResponse, PrescriptionInfo } from '../lib/types';
 import ProgressIndicator from './ProgressIndicator';
 import ProgressTracker from './ProgressTracker';
 import DataVerification from './DataVerification';
@@ -125,7 +125,12 @@ export default function ScanPage() {
         setProgressStep(4); // Complete
         
         // Store in context - check response structure
-        const prescriptionInfo = (prescriptionResponse as any).prescription_info || prescriptionResponse;
+        let prescriptionInfo: PrescriptionInfo | undefined;
+        if ('prescription_info' in prescriptionResponse) {
+          prescriptionInfo = (prescriptionResponse as ExtractPrescriptionResponse).prescription_info;
+        } else if ('medication_name' in prescriptionResponse) {
+          prescriptionInfo = prescriptionResponse as PrescriptionInfo;
+        }
         const extractedData = {
           medications: prescriptionInfo?.medication_name ? [{
             medication_name: prescriptionInfo.medication_name,
@@ -190,6 +195,8 @@ export default function ScanPage() {
       }
     } catch (err: unknown) {
       setProgressStep(0);
+      setProgressMessage('');
+      setProgressPercent(0);
       // Better error messages
       const errorMsg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setLocalError(errorMsg);
@@ -200,6 +207,8 @@ export default function ScanPage() {
         setError('scan', 'Authentication failed. Please check your API keys.');
       } else if (errorMsg.includes('429')) {
         setError('scan', 'Rate limit exceeded. Please try again in a moment.');
+      } else if (errorMsg.includes('Stream ended unexpectedly')) {
+        setError('scan', 'Connection interrupted. Please try again.');
       } else {
         setError('scan', errorMsg);
       }
@@ -569,7 +578,7 @@ export default function ScanPage() {
                     Raw Extracted Data ({Object.keys(result.extracted_data).length})
                   </summary>
                   <div className="p-4 pt-0 space-y-2 max-h-60 overflow-y-auto">
-                    {Object.entries(result.extracted_data).slice(0, 10).map(([key, value]: [string, any]) => (
+                    {Object.entries(result.extracted_data).slice(0, 10).map(([key, value]: [string, UIElement]) => (
                       <div key={key} className="text-xs p-2 bg-zinc-800 rounded">
                         <span className="text-blue-400 font-mono">{value.type}</span>
                         {value.label && <span className="text-zinc-300 ml-2">{value.label}</span>}

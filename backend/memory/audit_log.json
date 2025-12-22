@@ -1,0 +1,163 @@
+[
+  {
+    "timestamp": "2025-12-21T00:38:50.430061",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T00:40:32.970828",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "57e0fd84fcddd1e1d198d2e1c99205d2",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T00:50:46.053938",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "d41d8cd98f00b204e9800998ecf8427e",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T00:50:54.021631",
+    "user_id": "anonymous",
+    "action": "extract",
+    "resource_type": "prescription",
+    "resource_id": "d41d8cd98f00b204e9800998ecf8427e",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "prescription_extraction"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T00:53:33.547608",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "edc0e32fe1ce80c2990c5ab2fcedd1a1",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T16:30:03.718436",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T18:32:24.046006",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T18:32:24.582399",
+    "user_id": "anonymous",
+    "action": "extract",
+    "resource_type": "prescription",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "prescription_extraction"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:12:04.992987",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:12:11.380762",
+    "user_id": "anonymous",
+    "action": "extract",
+    "resource_type": "prescription",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "prescription_extraction"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:31:35.310389",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:31:36.003541",
+    "user_id": "anonymous",
+    "action": "extract",
+    "resource_type": "prescription",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "prescription_extraction"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:33:16.878283",
+    "user_id": "anonymous",
+    "action": "upload",
+    "resource_type": "image",
+    "resource_id": "c088a90234373a106abf70a382c54c3f2c77c8503e89d0ae5ce8c725744750e7",
+    "ip_address": "127.0.0.1",
+    "additional_info": {
+      "event": "image_upload"
+    }
+  },
+  {
+    "timestamp": "2025-12-21T19:33:17.993791",
+    "user_id": "anonymous",
+    "action": "view",
+    "resource_type": "prescription_interactions",
+    "resource_id": "Unknown,Unknown",
+    "ip_address": "127.0.0.1",
+    "additional_info": {}
+  },
+  {
+    "timestamp": "2025-12-21T20:56:19.044463",
+    "user_id": "anonymous",
+    "action": "view",
+    "resource_type": "prescription_interactions",
+    "resource_id": "date are not present",
+    "ip_address": "127.0.0.1",
+    "additional_info": {}
+  }
+]

@@ -6,10 +6,18 @@ import os
 import base64
 import json
 from typing import Optional, Dict, Any, Union
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
+try:
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.backends import default_backend
+    CRYPTOGRAPHY_AVAILABLE = True
+except (ImportError, RuntimeError) as e:
+    # Fallback for Python version compatibility issues
+    Fernet = None
+    CRYPTOGRAPHY_AVAILABLE = False
+    import warnings
+    warnings.warn(f"cryptography not available: {e}. Encryption features will be disabled.")
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +32,12 @@ class ImageEncryption:
         """
         Initialize encryption with key from environment or generate new
         """
+        if not CRYPTOGRAPHY_AVAILABLE:
+            logger.warning("Cryptography not available. Encryption features disabled.")
+            self.cipher = None
+            self.encryption_key = None
+            return
+            
         self.encryption_key = encryption_key or os.getenv("ENCRYPTION_KEY")
         
         if not self.encryption_key:
@@ -55,6 +69,9 @@ class ImageEncryption:
         """
         Encrypt image data before storage
         """
+        if not self.cipher:
+            logger.warning("Encryption not available. Returning unencrypted data.")
+            return image_data
         try:
             encrypted_data = self.cipher.encrypt(image_data)
             logger.info(f"Encrypted image: {len(image_data)} bytes → {len(encrypted_data)} bytes")
@@ -67,6 +84,9 @@ class ImageEncryption:
         """
         Decrypt image data for processing
         """
+        if not self.cipher:
+            logger.warning("Decryption not available. Returning data as-is.")
+            return encrypted_data
         try:
             decrypted_data = self.cipher.decrypt(encrypted_data)
             logger.info(f"Decrypted image: {len(encrypted_data)} bytes → {len(decrypted_data)} bytes")

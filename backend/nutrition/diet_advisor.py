@@ -42,25 +42,21 @@ class DietAdvisor:
     """
     
     def __init__(self, api_key: Optional[str] = None, use_gemini: bool = True):
-        # Prioritize Gemini if available (cheaper and avoids quota issues)
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.openai_api_key = api_key or os.getenv("OPENAI_API_KEY")
+        # FORCE GEMINI ONLY - OpenAI removed
+        if not GEMINI_AVAILABLE:
+            raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
         
-        # Force Gemini if key is available, otherwise use OpenAI
-        if use_gemini and GEMINI_AVAILABLE and self.gemini_api_key:
-            self.use_gemini = True
-            genai.configure(api_key=self.gemini_api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
-            self.client = None
-        elif OPENAI_AVAILABLE and self.openai_api_key:
-            self.use_gemini = False
-            self.client = OpenAI(api_key=self.openai_api_key)
-            self.model_name = "gpt-4o"
-            self.model = None
-        else:
-            self.use_gemini = False
-            self.client = None
-            self.model = None
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is required. OpenAI has been removed.")
+        
+        self.use_gemini = True
+        genai.configure(api_key=self.gemini_api_key)
+        from core.gemini_helper import get_gemini_model_with_fallback
+        self.model = get_gemini_model_with_fallback(api_key=self.gemini_api_key)
+        self.client = None
+        self.model_name = None
+        self.openai_api_key = None
         
         # Common medication-food interactions
         self.medication_food_interactions = {
@@ -133,7 +129,7 @@ Return ONLY valid JSON, no other text."""
                     generation_config={
                         "temperature": 0.3,
                         "max_output_tokens": 2000,
-                        "response_mime_type": "application/json"  # Force JSON output
+                        # response_mime_type removed - not supported in all API versions
                     }
                 )
                 result_text = response.text
@@ -143,57 +139,8 @@ Return ONLY valid JSON, no other text."""
                 if json_match:
                     result_text = json_match.group(1)
                 result_dict = json.loads(result_text)
-            elif self.client:
-                # Use OpenAI (fallback only)
-                try:
-                    response = self.client.chat.completions.create(
-                        model=self.model_name,
-                        messages=[
-                            {"role": "system", "content": "You are a medical nutritionist. Provide evidence-based dietary advice."},
-                            {"role": "user", "content": prompt}
-                        ],
-                        response_format={"type": "json_object"},
-                        temperature=0.3
-                    )
-                    result_text = response.choices[0].message.content
-                    result_dict = json.loads(result_text)
-                except Exception as openai_error:
-                    # If OpenAI fails (quota, etc.), try to use Gemini if available
-                    error_str = str(openai_error).lower()
-                    if ("quota" in error_str or "429" in error_str or "insufficient" in error_str) and self.gemini_api_key:
-                        # Retry with Gemini
-                        import logging
-                        logging.warning(f"OpenAI quota exceeded, switching to Gemini: {openai_error}")
-                        # Re-initialize Gemini if not already done
-                        if not self.model and GEMINI_AVAILABLE:
-                            genai.configure(api_key=self.gemini_api_key)
-                            self.model = genai.GenerativeModel('gemini-1.5-pro')
-                        if self.model:
-                            full_prompt = f"""You are a medical nutritionist. Provide evidence-based dietary advice.
-
-{prompt}
-
-Return ONLY valid JSON, no other text."""
-                            response = self.model.generate_content(
-                                full_prompt,
-                                generation_config={
-                                    "temperature": 0.3,
-                                    "max_output_tokens": 2000,
-                                    "response_mime_type": "application/json"
-                                }
-                            )
-                            result_text = response.text
-                            import re
-                            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', result_text, re.DOTALL)
-                            if json_match:
-                                result_text = json_match.group(1)
-                            result_dict = json.loads(result_text)
-                        else:
-                            raise openai_error
-                    else:
-                        raise openai_error
             else:
-                raise ValueError("No API client available")
+                raise ValueError("Gemini model not initialized. GEMINI_API_KEY is required.")
             
             # Check for medication-food interactions
             warnings = result_dict.get("warnings", [])

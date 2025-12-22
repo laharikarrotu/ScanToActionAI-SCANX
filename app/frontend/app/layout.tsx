@@ -30,8 +30,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <HealthScanProvider>
+          {/* Skip Navigation Link for Accessibility */}
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
           <Nav />
-          {children}
+          <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0">
+            {children}
+          </main>
         </HealthScanProvider>
       </body>
     </html>

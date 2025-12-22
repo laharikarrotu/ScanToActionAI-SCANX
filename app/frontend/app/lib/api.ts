@@ -4,7 +4,8 @@
 
 import type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Centralized API configuration
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Re-export types for convenience
 export type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback };
@@ -129,12 +130,23 @@ export async function extractPrescription(
 
       const processStream = async () => {
         try {
+          let hasCompleted = false;
+          const timeout = setTimeout(() => {
+            if (!hasCompleted) {
+              reader.cancel();
+              reject(new Error('Request timeout. The extraction is taking too long. Please try again.'));
+            }
+          }, 120000); // 2 minute timeout
+          
           while (true) {
             const { done, value } = await reader.read();
             
             if (done) {
-              // Stream ended without completion
-              reject(new Error('Stream ended unexpectedly'));
+              clearTimeout(timeout);
+              if (!hasCompleted) {
+                // Stream ended without completion - might be a network issue
+                reject(new Error('Connection closed unexpectedly. Please check your network and try again.'));
+              }
               break;
             }
 
@@ -143,6 +155,7 @@ export async function extractPrescription(
             buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
             for (const line of lines) {
+              if (line.trim() === '') continue; // Skip empty lines
               if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.slice(6));
@@ -152,14 +165,17 @@ export async function extractPrescription(
                     step: data.step,
                     progress: data.progress,
                     message: data.message,
-                    prescription_info: data.prescription_info
+                    prescription_info: data.prescription_info || data.data
                   });
 
                   // If complete, resolve with final data
-                  if (data.step === 'complete' && data.prescription_info) {
+                  if (data.step === 'complete' && (data.prescription_info || data.data)) {
+                    hasCompleted = true;
+                    clearTimeout(timeout);
+                    const prescriptionInfo = data.prescription_info || data.data;
                     resolve({
                       status: 'success',
-                      prescription_info: data.prescription_info,
+                      prescription_info: prescriptionInfo,
                       message: data.message || 'Prescription extracted successfully'
                     });
                     return;
@@ -167,6 +183,8 @@ export async function extractPrescription(
 
                   // If error, reject
                   if (data.step === 'error') {
+                    hasCompleted = true;
+                    clearTimeout(timeout);
                     reject(new Error(data.message || 'Extraction failed'));
                     return;
                   }
