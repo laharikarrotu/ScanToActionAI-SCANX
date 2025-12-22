@@ -33,9 +33,9 @@ export default function RootLayout({
             <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto">
               {children}
             </main>
-            <SpeedInsights />
           </HealthScanProvider>
         </ErrorBoundary>
+        <SpeedInsights />
       </body>
     </html>
   );
