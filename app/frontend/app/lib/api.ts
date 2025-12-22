@@ -5,12 +5,12 @@
 import type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback } from './types';
 
 // Centralized API configuration
-// In production, NEXT_PUBLIC_API_URL must be set
+// In production, NEXT_PUBLIC_API_URL must be set in Vercel environment variables
 const getApiBaseUrl = (): string => {
   const url = process.env.NEXT_PUBLIC_API_URL;
-  if (!url && process.env.NODE_ENV === 'production') {
-    console.error('NEXT_PUBLIC_API_URL is not set in production!');
-    throw new Error('API URL not configured. Please set NEXT_PUBLIC_API_URL environment variable.');
+  // Don't throw during build - only warn. Error will be caught at runtime.
+  if (!url && typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+    console.warn('NEXT_PUBLIC_API_URL is not set in production! Please set it in Vercel environment variables.');
   }
   return url || 'http://localhost:8000';
 };

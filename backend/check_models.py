@@ -13,11 +13,11 @@ try:
     api_key = settings.gemini_api_key
 except Exception as e:
     # Fallback to environment variable
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
+api_key = os.getenv('GEMINI_API_KEY')
+if not api_key:
         print(f"ERROR: Could not load GEMINI_API_KEY from config: {e}")
         print("Please set it in .env file or as environment variable")
-        exit(1)
+    exit(1)
 
 genai.configure(api_key=api_key)
 

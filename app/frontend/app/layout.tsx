@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import Nav from "./components/Nav";
 import NavigationLoading from "./components/NavigationLoading";
@@ -21,17 +22,18 @@ export default function RootLayout({
         className="antialiased h-full w-full flex flex-col bg-slate-50"
       >
         <ErrorBoundary>
-          <HealthScanProvider>
+        <HealthScanProvider>
             {/* Navigation Loading Indicator - Shows progress bar at top during navigation */}
             <NavigationLoading />
             {/* Skip Navigation Link for Accessibility */}
             <a href="#main-content" className="skip-link">
               Skip to main content
             </a>
-            <Nav />
+          <Nav />
             <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto">
               {children}
             </main>
+            <SpeedInsights />
           </HealthScanProvider>
         </ErrorBoundary>
       </body>

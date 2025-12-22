@@ -91,7 +91,7 @@ export default function DietPortal() {
       if (!response.ok) {
         let errorMessage = 'Failed to get recommendations';
         try {
-          const error = await response.json();
+        const error = await response.json();
           errorMessage = error.detail || error.message || errorMessage;
         } catch (e) {
           errorMessage = response.statusText || errorMessage;
@@ -150,7 +150,7 @@ export default function DietPortal() {
       if (!response.ok) {
         let errorMessage = 'Failed to check food';
         try {
-          const error = await response.json();
+        const error = await response.json();
           errorMessage = error.detail || error.message || errorMessage;
         } catch (e) {
           errorMessage = response.statusText || errorMessage;
@@ -204,7 +204,7 @@ export default function DietPortal() {
       if (!response.ok) {
         let errorMessage = 'Failed to generate meal plan';
         try {
-          const error = await response.json();
+        const error = await response.json();
           errorMessage = error.detail || error.message || errorMessage;
         } catch (e) {
           errorMessage = response.statusText || errorMessage;
@@ -706,14 +706,14 @@ export default function DietPortal() {
                       throw new Error(errorMessage);
                     }
 
-                    const data = await response.json();
+                      const data = await response.json();
                     if (data.status === 'error') {
                       throw new Error(data.message || 'An error occurred');
                     }
                     
                     const responseText = data.response || data.message || 'I understand your question. Let me help you with that.';
-                    setChatMessages(prev => [
-                      ...prev,
+                      setChatMessages(prev => [
+                        ...prev,
                       { role: 'assistant', content: responseText }
                     ]);
                   } catch (err: unknown) {
@@ -759,18 +759,18 @@ export default function DietPortal() {
               <div className="flex-1">
                 <p className="text-red-800 font-semibold mb-1">Error</p>
                 <p className="text-red-700 text-sm">{localError || errors.diet}</p>
-                {(localError || errors.diet)?.includes('Network') && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (activeTab === 'recommendations') handleGetRecommendations(e);
-                    }}
+            {(localError || errors.diet)?.includes('Network') && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (activeTab === 'recommendations') handleGetRecommendations(e);
+                }}
                     className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
                     aria-label="Retry request"
-                  >
-                    🔄 Retry
-                  </button>
-                )}
+              >
+                🔄 Retry
+              </button>
+            )}
               </div>
             </div>
           </div>

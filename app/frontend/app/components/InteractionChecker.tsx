@@ -90,7 +90,7 @@ export default function InteractionChecker() {
       if (!response.ok) {
         let errorMessage = 'Failed to check interactions';
         try {
-          const error = await response.json();
+        const error = await response.json();
           errorMessage = error.detail || error.message || errorMessage;
         } catch (e) {
           errorMessage = response.statusText || errorMessage;
@@ -255,15 +255,15 @@ export default function InteractionChecker() {
                 <div className="flex-1">
                   <p className="text-red-800 font-semibold mb-1">Error</p>
                   <p className="text-red-700 text-sm">{localError || errors.interactions}</p>
-                  {localError?.includes('Network') && (
-                    <button
-                      onClick={handleSubmit}
+              {localError?.includes('Network') && (
+                <button
+                  onClick={handleSubmit}
                       className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
                       aria-label="Retry checking interactions"
-                    >
-                      🔄 Retry
-                    </button>
-                  )}
+                >
+                  🔄 Retry
+                </button>
+              )}
                 </div>
               </div>
             </div>

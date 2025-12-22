@@ -42,7 +42,7 @@ export default function Nav() {
                 onClick={() => setMobileMenuOpen(false)}
               />
             ))}
-          </div>
+        </div>
 
           {/* Mobile Menu Button */}
           <button
@@ -59,9 +59,9 @@ export default function Nav() {
             </svg>
           </button>
         </div>
-
+          
         {/* Mobile Navigation - Using NavLink with loading states */}
-        {mobileMenuOpen && (
+          {mobileMenuOpen && (
           <div className="md:hidden border-t border-slate-200 py-2">
             {navLinks.map((link) => (
               <NavLink
@@ -72,8 +72,8 @@ export default function Nav() {
                 onClick={() => setMobileMenuOpen(false)}
               />
             ))}
-          </div>
-        )}
+            </div>
+          )}
       </div>
     </nav>
   );
