@@ -19,7 +19,7 @@ export default function MedicalLoading({ message, variant = 'default' }: Medical
     <div className="medical-card bg-white rounded-2xl p-6 shadow-lg">
       <div className="flex items-center gap-4">
         <div className="relative">
-          <div className="spinner w-10 h-10 border-3 border-blue-500 border-t-transparent"></div>
+          <div className="spinner w-10 h-10 border-[3px] border-blue-500 border-t-transparent"></div>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-lg">⚕️</span>
           </div>

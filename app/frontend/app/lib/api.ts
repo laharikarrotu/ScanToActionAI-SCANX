@@ -5,7 +5,17 @@
 import type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback } from './types';
 
 // Centralized API configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// In production, NEXT_PUBLIC_API_URL must be set
+const getApiBaseUrl = (): string => {
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url && process.env.NODE_ENV === 'production') {
+    console.error('NEXT_PUBLIC_API_URL is not set in production!');
+    throw new Error('API URL not configured. Please set NEXT_PUBLIC_API_URL environment variable.');
+  }
+  return url || 'http://localhost:8000';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 // Re-export types for convenience
 export type { AnalyzeResponse, ExtractPrescriptionResponse, StreamingProgress, StreamingCallback };

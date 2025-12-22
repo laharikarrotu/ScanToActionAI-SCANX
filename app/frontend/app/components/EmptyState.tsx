@@ -47,7 +47,7 @@ export default function EmptyState({ type, message, actionLabel, onAction }: Emp
         <span className="text-4xl">{config.icon}</span>
       </div>
       <h3 className="text-xl font-bold text-slate-800 mb-3">{config.title}</h3>
-      <p className="text-slate-600 mb-6 max-w-md mx-auto">
+      <p className="text-slate-600 mb-6 w-full mx-auto">
         {message || config.defaultMessage}
       </p>
       {onAction && (

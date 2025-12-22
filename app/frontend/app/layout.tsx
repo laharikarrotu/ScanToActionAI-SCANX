@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "./components/Nav";
+import NavigationLoading from "./components/NavigationLoading";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { HealthScanProvider } from "./context/HealthScanContext";
 
 const geistSans = Geist({
@@ -25,20 +27,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full w-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full w-full flex flex-col bg-slate-50`}
       >
-        <HealthScanProvider>
-          {/* Skip Navigation Link for Accessibility */}
-          <a href="#main-content" className="skip-link">
-            Skip to main content
-          </a>
-          <Nav />
-          <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0">
-            {children}
-          </main>
-        </HealthScanProvider>
+        <ErrorBoundary>
+          <HealthScanProvider>
+            {/* Navigation Loading Indicator - Shows progress bar at top during navigation */}
+            <NavigationLoading />
+            {/* Skip Navigation Link for Accessibility */}
+            <a href="#main-content" className="skip-link">
+              Skip to main content
+            </a>
+            <Nav />
+            <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto">
+              {children}
+            </main>
+          </HealthScanProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

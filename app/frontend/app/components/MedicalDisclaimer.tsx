@@ -9,7 +9,7 @@ export default function MedicalDisclaimer({ variant = 'default', className = '' 
   if (variant === 'footer') {
     return (
       <footer className={`medical-card border-t-2 border-blue-200 mt-12 p-6 ${className}`}>
-        <div className="max-w-5xl mx-auto">
+        <div className="w-full mx-auto px-6 md:px-10">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0">
               <span className="text-2xl">⚠️</span>

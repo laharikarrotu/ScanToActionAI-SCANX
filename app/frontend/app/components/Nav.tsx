@@ -3,105 +3,78 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import NavLink from './NavLink';
 
 export default function Nav() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  const navLinks = [
+    { href: '/', label: 'Chat Assistant', icon: '💬' },
+    { href: '/scan', label: 'Scan Prescription', icon: '📋' },
+    { href: '/interactions', label: 'Drug Interactions', icon: '💊' },
+    { href: '/diet', label: 'Diet Portal', icon: '🥗' },
+  ];
+  
   return (
-    <nav className="glass-strong border-b border-blue-200/50 sticky top-0 z-50 backdrop-blur-xl bg-white/95">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
-        {/* Desktop Navigation - Medical Theme */}
-        <div className="hidden md:flex items-center gap-2">
-          <Link 
-            href="/" 
-            className={`px-4 py-2.5 rounded-xl transition-all font-semibold text-sm medical-card ${
-              pathname === '/' 
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg glow' 
-                : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50 border-blue-100'
-            }`}
-          >
-            💬 Chat Assistant
+    <nav className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+              <span className="text-xl">🏥</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">HealthScan</h1>
+              <p className="text-xs text-slate-500 hidden sm:block">AI Healthcare Assistant</p>
+            </div>
           </Link>
-          <Link 
-            href="/interactions" 
-            className={`px-4 py-2.5 rounded-xl transition-all font-semibold text-sm medical-card ${
-              pathname === '/interactions' 
-                ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg glow-teal' 
-                : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50 border-blue-100'
-            }`}
-          >
-            💊 Drug Interactions
-          </Link>
-          <Link 
-            href="/diet" 
-            className={`px-4 py-2.5 rounded-xl transition-all font-semibold text-sm medical-card ${
-              pathname === '/diet' 
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg glow-green' 
-                : 'text-slate-700 hover:text-emerald-600 hover:bg-emerald-50 border-emerald-100'
-            }`}
-          >
-            🥗 Diet Portal
-          </Link>
-        </div>
 
-        {/* Mobile Navigation - Medical Theme */}
-        <div className="md:hidden">
+          {/* Desktop Navigation - Using NavLink with loading states */}
+          <div className="hidden md:flex items-center gap-1">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.href}
+                href={link.href}
+                label={link.label}
+                icon={link.icon}
+                onClick={() => setMobileMenuOpen(false)}
+              />
+            ))}
+          </div>
+
+          {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex items-center justify-between w-full text-slate-800 hover:text-blue-600 transition-colors"
+            className="md:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors"
+            aria-label="Toggle menu"
           >
-            <span className="text-lg font-bold gradient-text">HealthScan</span>
-            <svg
-              className={`w-6 h-6 transition-transform duration-300 ${mobileMenuOpen ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
             </svg>
           </button>
-          
-          {mobileMenuOpen && (
-            <div className="mt-3 space-y-2 slide-up">
-              <Link 
-                href="/" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block px-4 py-3 rounded-xl transition-all font-semibold medical-card ${
-                  pathname === '/' 
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg' 
-                    : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50 border-blue-100'
-                }`}
-              >
-                💬 Chat Assistant
-              </Link>
-              <Link 
-                href="/interactions" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block px-4 py-3 rounded-xl transition-all font-semibold medical-card ${
-                  pathname === '/interactions' 
-                    ? 'bg-gradient-to-r from-blue-500 to-teal-500 text-white shadow-lg' 
-                    : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50 border-blue-100'
-                }`}
-              >
-                💊 Drug Interactions
-              </Link>
-              <Link 
-                href="/diet" 
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block px-4 py-3 rounded-xl transition-all font-semibold medical-card ${
-                  pathname === '/diet' 
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg' 
-                    : 'text-slate-700 hover:text-emerald-600 hover:bg-emerald-50 border-emerald-100'
-                }`}
-              >
-                🥗 Diet Portal
-              </Link>
-            </div>
-          )}
         </div>
+
+        {/* Mobile Navigation - Using NavLink with loading states */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 py-2">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.href}
+                href={link.href}
+                label={link.label}
+                icon={link.icon}
+                onClick={() => setMobileMenuOpen(false)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </nav>
   );
 }
-

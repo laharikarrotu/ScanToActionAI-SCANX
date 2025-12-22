@@ -8,6 +8,7 @@ import ProgressIndicator from './ProgressIndicator';
 import ProgressTracker from './ProgressTracker';
 import DataVerification from './DataVerification';
 import { useHealthScan } from '../context/HealthScanContext';
+import { safeStorage } from '../lib/storage';
 
 export default function ScanPage() {
   const router = useRouter();
@@ -202,7 +203,7 @@ export default function ScanPage() {
       setLocalError(errorMsg);
       
       if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
-        setError('scan', 'Cannot connect to server. Make sure the backend is running on http://localhost:8000');
+        setError('scan', `Cannot connect to server. Make sure the backend is running on ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}`);
       } else if (errorMsg.includes('401') || errorMsg.includes('403')) {
         setError('scan', 'Authentication failed. Please check your API keys.');
       } else if (errorMsg.includes('429')) {
@@ -295,32 +296,41 @@ export default function ScanPage() {
           onCancel={handleVerificationCancel}
         />
       )}
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-950 text-white p-4 pb-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6 md:mb-8 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">HealthScan</h1>
-          <p className="text-sm md:text-base text-blue-300 px-2">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
+      <div className="h-full w-full text-slate-800 relative overflow-y-auto">
+        {/* Medical Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,132,199,0.05),transparent_50%)]"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(6,182,212,0.05),transparent_50%)]"></div>
         </div>
+
+        <div className="relative w-full mx-auto px-6 md:px-10 py-4 md:py-6 z-10">
+          <div className="mb-6 sm:mb-8 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 mb-4 shadow-lg glow-teal medical-card">
+              <span className="text-2xl sm:text-3xl">📋</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 gradient-text">HealthScan</h1>
+            <p className="text-sm sm:text-base text-slate-600 font-medium px-2">Your AI healthcare assistant - scan forms, prescriptions, and documents</p>
+          </div>
         
         {/* Progress Tracker */}
         <ProgressTracker />
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Image Upload Section */}
-          <div className="bg-zinc-800 rounded-lg p-4 md:p-6 border border-zinc-700">
-            <h2 className="text-lg md:text-xl font-semibold mb-4">1. Upload or Capture Image</h2>
+          <div className="medical-card p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800">1. Upload or Capture Image</h2>
             
             {imagePreview ? (
               <div className="space-y-4">
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="max-w-full h-auto rounded-lg border border-zinc-700"
+                  className="max-w-full h-auto rounded-xl border-2 border-blue-200 shadow-md"
                 />
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="text-sm text-zinc-400 hover:text-white"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
                   Change image
                 </button>
@@ -335,9 +345,9 @@ export default function ScanPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <div className="border-2 border-dashed border-zinc-600 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
-                    <p className="text-zinc-400">Click to upload</p>
-                    <p className="text-sm text-zinc-500 mt-2">or drag and drop</p>
+                  <div className="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all medical-card">
+                    <p className="text-slate-700 font-medium">Click to upload</p>
+                    <p className="text-sm text-slate-500 mt-2">or drag and drop</p>
                   </div>
                 </label>
                 
@@ -350,9 +360,9 @@ export default function ScanPage() {
                     onChange={handleCameraCapture}
                     className="hidden"
                   />
-                  <div className="border-2 border-dashed border-zinc-600 rounded-lg p-8 text-center hover:border-green-500 transition-colors">
-                    <p className="text-zinc-400">📷 Use Camera</p>
-                    <p className="text-sm text-zinc-500 mt-2">Mobile only</p>
+                  <div className="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all medical-card">
+                    <p className="text-slate-700 font-medium">📷 Use Camera</p>
+                    <p className="text-sm text-slate-500 mt-2">Mobile only</p>
                   </div>
                 </label>
               </div>
@@ -360,23 +370,23 @@ export default function ScanPage() {
           </div>
 
           {/* Intent Input */}
-          <div className="bg-zinc-800 rounded-lg p-4 md:p-6 border border-zinc-700">
-            <h2 className="text-lg md:text-xl font-semibold mb-4">2. What do you need help with?</h2>
+          <div className="medical-card p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800">2. What do you need help with?</h2>
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
               placeholder="Leave empty for FAST prescription extraction ⚡ OR enter: Fill form, Book appointment, Extract data..."
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+              className="w-full medical-card border border-blue-200 rounded-xl px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all min-h-[100px]"
               rows={3}
             />
-            <p className="text-sm text-zinc-500 mt-2">
+            <p className="text-sm text-slate-600 mt-2">
               💡 <strong>Tip:</strong> Leave empty for instant prescription extraction (like ChatGPT) | Or enter intent for form filling
             </p>
           </div>
 
           {/* Progress Indicator */}
           {loading && (
-            <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
+            <div className="medical-card p-4 sm:p-6">
               <ProgressIndicator 
                 steps={['Analyzing Image', 'Planning Actions', 'Executing', 'Complete']}
                 currentStep={progressStep}
@@ -388,14 +398,11 @@ export default function ScanPage() {
           <button
             type="submit"
             disabled={loading || !image || !intent.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px]"
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <div className="spinner w-5 h-5 border-2 border-white border-t-transparent"></div>
                 Processing...
               </>
             ) : (
@@ -404,30 +411,36 @@ export default function ScanPage() {
           </button>
 
           {(localError || errors.scan) && (
-            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
-              <p>{localError || errors.scan}</p>
-              {(localError || errors.scan)?.includes('Network') && (
-                <button
-                  onClick={handleSubmit}
-                  className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-800 rounded text-sm"
-                >
-                  🔄 Retry
-                </button>
-              )}
+            <div className="medical-card bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-red-800 font-semibold mb-1">Error</p>
+                  <p className="text-red-700 text-sm">{localError || errors.scan}</p>
+                  {(localError || errors.scan)?.includes('Network') && (
+                    <button
+                      onClick={handleSubmit}
+                      className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      🔄 Retry
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </form>
 
         {/* Results */}
         {result && (
-          <div className="mt-8 bg-zinc-800 rounded-lg p-6 border border-zinc-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="mt-8 medical-card p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Results</h2>
+              <h2 className="text-xl font-semibold text-slate-800">Results</h2>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                result.status === 'success' ? 'bg-green-900/30 text-green-400' :
-                result.status === 'partial' ? 'bg-yellow-900/30 text-yellow-400' :
-                result.status === 'error' ? 'bg-red-900/30 text-red-400' :
-                'bg-blue-900/30 text-blue-400'
+                result.status === 'success' ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' :
+                result.status === 'partial' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                result.status === 'error' ? 'bg-red-100 text-red-700 border border-red-300' :
+                'bg-blue-100 text-blue-700 border border-blue-300'
               }`}>
                 {result.status === 'success' && '✓ Success'}
                 {result.status === 'partial' && '⚠ Partial'}
@@ -439,26 +452,26 @@ export default function ScanPage() {
             
             <div className="space-y-4">
               {result.message && (
-                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
-                  <p className="text-blue-300">{result.message}</p>
+                <div className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
+                  <p className="text-blue-700">{result.message}</p>
                 </div>
               )}
               
               {result.plan && result.plan.steps && (
-                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">Action Plan</h3>
+                <div className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">Action Plan</h3>
                   <div className="space-y-2">
                     {result.plan.steps.map((step: ActionStep, idx: number) => (
-                      <div key={idx} className="flex items-start gap-3 p-2 bg-zinc-800 rounded">
-                        <span className="text-blue-400 font-mono text-xs mt-1">{step.step}.</span>
+                      <div key={idx} className="flex items-start gap-3 p-2 medical-card bg-white rounded-lg">
+                        <span className="text-blue-600 font-mono text-xs mt-1">{step.step}.</span>
                         <div className="flex-1">
-                          <p className="text-sm text-white">
+                          <p className="text-sm text-slate-800">
                             <span className="font-semibold capitalize">{step.action}</span>
-                            {step.target && <span className="text-zinc-400"> on {step.target}</span>}
-                            {step.value && <span className="text-zinc-500">: {step.value}</span>}
+                            {step.target && <span className="text-slate-600"> on {step.target}</span>}
+                            {step.value && <span className="text-slate-500">: {step.value}</span>}
                           </p>
                           {step.description && (
-                            <p className="text-xs text-zinc-500 mt-1">{step.description}</p>
+                            <p className="text-xs text-slate-500 mt-1">{step.description}</p>
                           )}
                         </div>
                       </div>
@@ -468,22 +481,22 @@ export default function ScanPage() {
               )}
 
               {result.execution && (
-                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">Execution Log</h3>
+                <div className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">Execution Log</h3>
                   <div className="space-y-1 max-h-60 overflow-y-auto">
                     {result.execution.logs && result.execution.logs.map((log: string, idx: number) => (
-                      <div key={idx} className="text-xs font-mono text-zinc-400 py-1">
-                        {log.startsWith('✓') && <span className="text-green-400">{log}</span>}
-                        {log.startsWith('✗') && <span className="text-red-400">{log}</span>}
-                        {log.startsWith('⚠') && <span className="text-yellow-400">{log}</span>}
+                      <div key={idx} className="text-xs font-mono text-slate-600 py-1">
+                        {log.startsWith('✓') && <span className="text-emerald-600">{log}</span>}
+                        {log.startsWith('✗') && <span className="text-red-600">{log}</span>}
+                        {log.startsWith('⚠') && <span className="text-amber-600">{log}</span>}
                         {!log.startsWith('✓') && !log.startsWith('✗') && !log.startsWith('⚠') && log}
                       </div>
                     ))}
                   </div>
                   {result.execution.final_url && (
-                    <div className="mt-3 pt-3 border-t border-zinc-700">
-                      <p className="text-xs text-zinc-400">Final URL:</p>
-                      <a href={result.execution.final_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline break-all">
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-xs text-slate-600">Final URL:</p>
+                      <a href={result.execution.final_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline break-all">
                         {result.execution.final_url}
                       </a>
                     </div>
@@ -492,62 +505,62 @@ export default function ScanPage() {
               )}
 
               {result.structured_data && result.structured_data.medications && (
-                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-700">
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">📋 Extracted Prescription Data</h3>
+                <div className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">📋 Extracted Prescription Data</h3>
                   <div className="space-y-3">
                     {Array.isArray(result.structured_data.medications) ? (
                       result.structured_data.medications.map((med: Medication, idx: number) => (
-                        <div key={idx} className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                          <div className="font-semibold text-white mb-2">{med.medication_name || 'Unknown Medication'}</div>
+                        <div key={idx} className="medical-card bg-white rounded-xl p-3">
+                          <div className="font-semibold text-slate-800 mb-2">{med.medication_name || 'Unknown Medication'}</div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
-                            {med.dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{med.dosage}</span></div>}
-                            {med.frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{med.frequency}</span></div>}
-                            {med.quantity && <div><span className="text-zinc-400">Quantity:</span> <span className="text-white">{med.quantity}</span></div>}
-                            {med.refills && <div><span className="text-zinc-400">Refills:</span> <span className="text-white">{med.refills}</span></div>}
+                            {med.dosage && <div><span className="text-slate-600">Dosage:</span> <span className="text-slate-800 font-medium">{med.dosage}</span></div>}
+                            {med.frequency && <div><span className="text-slate-600">Frequency:</span> <span className="text-slate-800 font-medium">{med.frequency}</span></div>}
+                            {med.quantity && <div><span className="text-slate-600">Quantity:</span> <span className="text-slate-800 font-medium">{med.quantity}</span></div>}
+                            {med.refills && <div><span className="text-slate-600">Refills:</span> <span className="text-slate-800 font-medium">{med.refills}</span></div>}
                           </div>
                           {med.instructions && (
                             <div className="mt-2 text-xs">
-                              <span className="text-zinc-400">Instructions:</span>
-                              <span className="text-white ml-2">{med.instructions}</span>
+                              <span className="text-slate-600">Instructions:</span>
+                              <span className="text-slate-800 ml-2">{med.instructions}</span>
                             </div>
                           )}
                         </div>
                       ))
                     ) : (
-                      <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700">
-                        <div className="font-semibold text-white mb-2">{(result.structured_data.medications as Medication).medication_name || 'Medication'}</div>
+                      <div className="medical-card bg-white rounded-xl p-3">
+                        <div className="font-semibold text-slate-800 mb-2">{(result.structured_data.medications as Medication).medication_name || 'Medication'}</div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          {(result.structured_data.medications as Medication).dosage && <div><span className="text-zinc-400">Dosage:</span> <span className="text-white">{(result.structured_data.medications as Medication).dosage}</span></div>}
-                          {(result.structured_data.medications as Medication).frequency && <div><span className="text-zinc-400">Frequency:</span> <span className="text-white">{(result.structured_data.medications as Medication).frequency}</span></div>}
+                          {(result.structured_data.medications as Medication).dosage && <div><span className="text-slate-600">Dosage:</span> <span className="text-slate-800 font-medium">{(result.structured_data.medications as Medication).dosage}</span></div>}
+                          {(result.structured_data.medications as Medication).frequency && <div><span className="text-slate-600">Frequency:</span> <span className="text-slate-800 font-medium">{(result.structured_data.medications as Medication).frequency}</span></div>}
                         </div>
                       </div>
                     )}
                     {result.structured_data.prescriber && (
-                      <div className="text-xs text-zinc-400">
-                        Prescriber: <span className="text-white">{result.structured_data.prescriber}</span>
+                      <div className="text-xs text-slate-600">
+                        Prescriber: <span className="text-slate-800 font-medium">{result.structured_data.prescriber}</span>
                       </div>
                     )}
                     {result.structured_data.date && (
-                      <div className="text-xs text-zinc-400">
-                        Date: <span className="text-white">{result.structured_data.date}</span>
+                      <div className="text-xs text-slate-600">
+                        Date: <span className="text-slate-800 font-medium">{result.structured_data.date}</span>
                       </div>
                     )}
                   </div>
                   
                   {/* Quick Actions - Integration Buttons */}
-                  <div className="mt-4 pt-4 border-t border-zinc-700 flex gap-2 flex-wrap">
+                  <div className="mt-4 pt-4 border-t border-blue-200 flex gap-2 flex-wrap">
                     <button
                       onClick={() => {
                         if (!result.structured_data?.medications) return;
-                        // Store medications in localStorage
+                        // Store medications in localStorage (safely)
                         const medications: Medication[] = Array.isArray(result.structured_data.medications) 
                           ? result.structured_data.medications 
                           : [result.structured_data.medications as Medication];
-                        localStorage.setItem('extracted_medications', JSON.stringify(medications));
-                        localStorage.setItem('prescription_image', imagePreview || '');
+                        safeStorage.setItem('extracted_medications', JSON.stringify(medications));
+                        safeStorage.setItem('prescription_image', imagePreview || '');
                         router.push('/interactions');
                       }}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+                      className="px-4 py-2 btn-primary text-white text-sm rounded-xl transition-all"
                     >
                       💊 Check Drug Interactions
                     </button>
@@ -560,10 +573,10 @@ export default function ScanPage() {
                             ? result.structured_data.medications 
                             : [result.structured_data.medications as Medication];
                           const medNames = medications.map((m: Medication) => m.medication_name).join(', ');
-                          localStorage.setItem('current_medications', medNames);
+                          safeStorage.setItem('current_medications', medNames);
                           router.push('/diet');
                         }}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+                        className="px-4 py-2 btn-primary text-white text-sm rounded-xl transition-all min-h-[44px]"
                       >
                         🥗 Get Diet Recommendations
                       </button>
@@ -573,16 +586,16 @@ export default function ScanPage() {
               )}
 
               {result.extracted_data && Object.keys(result.extracted_data).length > 0 && (
-                <details className="bg-zinc-900/50 rounded-lg border border-zinc-700">
-                  <summary className="p-4 cursor-pointer text-sm font-semibold text-zinc-300">
+                <details className="medical-card bg-blue-50 border-blue-200 rounded-xl">
+                  <summary className="p-4 cursor-pointer text-sm font-semibold text-slate-700">
                     Raw Extracted Data ({Object.keys(result.extracted_data).length})
                   </summary>
                   <div className="p-4 pt-0 space-y-2 max-h-60 overflow-y-auto">
                     {Object.entries(result.extracted_data).slice(0, 10).map(([key, value]: [string, UIElement]) => (
-                      <div key={key} className="text-xs p-2 bg-zinc-800 rounded">
-                        <span className="text-blue-400 font-mono">{value.type}</span>
-                        {value.label && <span className="text-zinc-300 ml-2">{value.label}</span>}
-                        {value.value && <span className="text-zinc-500 ml-2">→ {value.value}</span>}
+                      <div key={key} className="text-xs p-2 medical-card bg-white rounded-lg">
+                        <span className="text-blue-600 font-mono">{value.type}</span>
+                        {value.label && <span className="text-slate-700 ml-2">{value.label}</span>}
+                        {value.value && <span className="text-slate-500 ml-2">→ {value.value}</span>}
                       </div>
                     ))}
                   </div>
@@ -590,19 +603,19 @@ export default function ScanPage() {
               )}
 
               {result.ui_schema && result.ui_schema.elements && (
-                <details className="bg-zinc-900/50 rounded-lg border border-zinc-700">
-                  <summary className="p-4 cursor-pointer text-sm font-semibold text-zinc-300">
+                <details className="medical-card bg-blue-50 border-blue-200 rounded-xl">
+                  <summary className="p-4 cursor-pointer text-sm font-semibold text-slate-700">
                     Detected UI Elements ({result.ui_schema.elements.length})
                   </summary>
                   <div className="p-4 pt-0 space-y-2 max-h-60 overflow-y-auto">
                     {result.ui_schema.elements.slice(0, 10).map((elem: UIElement, idx: number) => (
-                      <div key={idx} className="text-xs p-2 bg-zinc-800 rounded">
-                        <span className="text-blue-400 font-mono">{elem.type}</span>
-                        {elem.label && <span className="text-zinc-300 ml-2">{elem.label}</span>}
+                      <div key={idx} className="text-xs p-2 medical-card bg-white rounded-lg">
+                        <span className="text-blue-600 font-mono">{elem.type}</span>
+                        {elem.label && <span className="text-slate-700 ml-2">{elem.label}</span>}
                       </div>
                     ))}
                     {result.ui_schema.elements.length > 10 && (
-                      <p className="text-xs text-zinc-500">... and {result.ui_schema.elements.length - 10} more</p>
+                      <p className="text-xs text-slate-500">... and {result.ui_schema.elements.length - 10} more</p>
                     )}
                   </div>
                 </details>
@@ -611,7 +624,7 @@ export default function ScanPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleReset}
-                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="flex-1 medical-card bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-4 rounded-xl transition-colors border border-slate-300"
                 >
                   Start Over
                 </button>
@@ -623,7 +636,7 @@ export default function ScanPage() {
                         alert(`Screenshot saved at: ${result.execution.screenshot_path}\n(Backend endpoint not implemented yet)`);
                       }
                     }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    className="flex-1 btn-primary text-white font-medium py-2 px-4 rounded-xl transition-all"
                   >
                     View Screenshot Info
                   </button>

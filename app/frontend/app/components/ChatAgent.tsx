@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useHealthScan } from '../context/HealthScanContext';
 import { API_BASE_URL } from '../lib/api';
 import type { PrescriptionInfo } from '../lib/types';
 import MedicalDisclaimer from './MedicalDisclaimer';
-import TrustIndicators from './TrustIndicators';
 import PrescriptionCard from './PrescriptionCard';
 import EmptyState from './EmptyState';
 import MedicalLoading from './MedicalLoading';
 import MedicalError from './MedicalError';
+import StreamingProgress from './StreamingProgress';
+import TrustIndicators from './TrustIndicators';
 
 interface Message {
   id: string;
@@ -21,6 +23,7 @@ interface Message {
 }
 
 export default function ChatAgent() {
+  const router = useRouter();
   const {
     prescriptionData,
     setPrescriptionData,
@@ -34,28 +37,9 @@ export default function ChatAgent() {
     {
       id: '1',
       role: 'assistant',
-      content: `🏥 **Welcome to HealthScan - Your AI Healthcare Assistant**
+      content: `🏥 **Welcome to HealthScan**
 
-I help you understand your medications and health information through three key features:
-
-📋 **1. Prescription Extraction**
-   → Upload prescription images to extract medication details
-
-💊 **2. Drug Interaction Checking**  
-   → Upload multiple prescriptions to check for interactions
-
-🥗 **3. Diet Recommendations**
-   → Get personalized diet plans based on your medical condition
-
-**How to use:**
-1. Upload a prescription image (or multiple for interaction checking)
-2. I'll analyze and explain what I find
-3. Ask me questions about your medications, interactions, or diet
-4. I'll guide you through the HealthScan workflow
-
-⚠️ **Important**: I'm a healthcare assistant, not a replacement for professional medical advice. Always consult your doctor for medical decisions.
-
-What would you like to start with?`,
+Your AI-powered healthcare assistant. Get started by choosing an action below.`,
       timestamp: new Date(),
     },
   ]);
@@ -63,8 +47,11 @@ What would you like to start with?`,
   const [images, setImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [streamingProgress, setStreamingProgress] = useState<{step: string; progress: number; message: string} | null>(null);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]); // Track timeouts for cleanup
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,6 +60,14 @@ What would you like to start with?`,
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current = [];
+    };
+  }, []);
 
   // Auto-check interactions if multiple images uploaded (after processing)
   // This will be triggered after prescription extraction completes
@@ -110,43 +105,62 @@ What would you like to start with?`,
         body: formData,
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setInteractionResult({
-          warnings: data.warnings || data.interactions || { major: [], moderate: [], minor: [] },
-          prescription_details: data.prescription_details || data.prescriptions || [],
-        });
-
-        const hasInteractions = data.has_interactions;
-        const majorCount = (data.interactions?.major?.length || data.warnings?.major?.length || 0);
-        const moderateCount = (data.interactions?.moderate?.length || data.warnings?.moderate?.length || 0);
-        const minorCount = (data.interactions?.minor?.length || data.warnings?.minor?.length || 0);
-
-        let message = `💊 **Drug Interaction Analysis Complete**\n\n`;
-        
-        if (hasInteractions) {
-          message += `⚠️ **Interactions Found:**\n`;
-          message += `- Major: ${majorCount}\n`;
-          message += `- Moderate: ${moderateCount}\n`;
-          message += `- Minor: ${minorCount}\n\n`;
-          message += `**Important**: Please review these interactions carefully. For major interactions, consult your doctor immediately.\n\n`;
-        } else {
-          message += `✅ **No Drug Interactions Detected**\n\n`;
-          message += `Your medications appear to be safe to take together. However, always consult your healthcare provider for final confirmation.\n\n`;
+      if (!response.ok) {
+        let errorMessage = 'Failed to check interactions';
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || (error.status === 'error' ? error.message : errorMessage);
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage;
         }
-        
-        message += `💡 **Next Steps:**\n`;
-        message += `1️⃣ Ask me to explain specific interactions in detail\n`;
-        message += `2️⃣ Get diet recommendations based on your medications\n`;
-        message += `3️⃣ Ask questions about your prescriptions\n\n`;
-        message += `What would you like to know?`;
-
-        addMessage('assistant', message);
-      } else {
-        addMessage('assistant', '❌ Failed to check interactions. Please try uploading the images again.');
+        throw new Error(errorMessage);
       }
+
+      const data = await response.json();
+      
+      // Validate response structure
+      if (data.status === 'error') {
+        throw new Error(data.message || 'An error occurred while checking interactions');
+      }
+      
+      // Use warnings or interactions (backend provides both)
+      const warnings = data.warnings || data.interactions || { major: [], moderate: [], minor: [] };
+      const prescriptionDetails = data.prescription_details || data.prescriptions || [];
+      
+      setInteractionResult({
+        warnings: warnings,
+        prescription_details: prescriptionDetails,
+      });
+
+      const hasInteractions = data.has_interactions;
+      const majorCount = (warnings.major?.length || 0);
+      const moderateCount = (warnings.moderate?.length || 0);
+      const minorCount = (warnings.minor?.length || 0);
+
+      let message = `💊 **Drug Interaction Analysis Complete**\n\n`;
+      
+      if (hasInteractions) {
+        message += `⚠️ **Interactions Found:**\n`;
+        message += `- Major: ${majorCount}\n`;
+        message += `- Moderate: ${moderateCount}\n`;
+        message += `- Minor: ${minorCount}\n\n`;
+        message += `**Important**: Please review these interactions carefully. For major interactions, consult your doctor immediately.\n\n`;
+      } else {
+        message += `✅ **No Drug Interactions Detected**\n\n`;
+        message += `Your medications appear to be safe to take together. However, always consult your healthcare provider for final confirmation.\n\n`;
+      }
+      
+      message += `💡 **Next Steps:**\n`;
+      message += `1️⃣ Ask me to explain specific interactions in detail\n`;
+      message += `2️⃣ Get diet recommendations based on your medications\n`;
+      message += `3️⃣ Ask questions about your prescriptions\n\n`;
+      message += `What would you like to know?`;
+
+      addMessage('assistant', message);
     } catch (err) {
-      addMessage('assistant', '❌ Failed to check interactions. Please check your connection and try again.');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to check interactions';
+      addMessage('assistant', `❌ **Error:** ${errorMsg}\n\nPlease check your connection and try again.`, undefined, undefined, true);
+      setErrorState(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -224,7 +238,19 @@ What would you like to start with?`,
                   if (line.startsWith('data: ')) {
                     try {
                       const data = JSON.parse(line.slice(6));
+                      
+                      // Update streaming progress
+                      if (data.step && data.progress !== undefined) {
+                        setStreamingProgress({
+                          step: data.step,
+                          progress: data.progress,
+                          message: data.message || ''
+                        });
+                      }
+                      
                       if (data.step === 'complete' && data.prescription_info) {
+                        setStreamingProgress(null); // Clear progress when complete
+                        setLoading(false);
                         const info = data.prescription_info;
                         setPrescriptionData({
                           medications: [{
@@ -256,7 +282,8 @@ What would you like to start with?`,
                           explanation += `I see you uploaded ${images.length} prescription images. Let me automatically check for drug interactions...\n\n`;
                           addMessage('assistant', explanation, undefined, info);
                           // Trigger auto-check after message is added
-                          setTimeout(() => checkInteractionsAuto(), 500);
+                          const timeout = setTimeout(() => checkInteractionsAuto(), 500);
+                          timeoutRefs.current.push(timeout);
                         } else {
                           explanation += `💡 **Next Steps in HealthScan Workflow:**\n\n`;
                           explanation += `1️⃣ **Check Drug Interactions** - Upload additional prescriptions to check for interactions\n`;
@@ -265,6 +292,17 @@ What would you like to start with?`,
                           explanation += `What would you like to do next?`;
                           addMessage('assistant', explanation, undefined, info);
                         }
+                        setStreamingProgress(null);
+                        setLoading(false);
+                        return;
+                      }
+                      
+                      // Handle error step
+                      if (data.step === 'error') {
+                        setStreamingProgress(null);
+                        setErrorState(data.message || 'Extraction failed');
+                        setLoading(false);
+                        return;
                       }
                     } catch (e) {
                       // Ignore parse errors
@@ -328,12 +366,24 @@ What would you like to start with?`,
           }),
         });
 
-        if (chatResponse.ok) {
-          const data = await chatResponse.json();
-          addMessage('assistant', data.response || data.message);
-        } else {
-          addMessage('assistant', 'I understand your question. Let me help you with that based on the information I have.');
+        if (!chatResponse.ok) {
+          let errorMessage = 'Failed to get a response from the AI';
+          try {
+            const error = await chatResponse.json();
+            errorMessage = error.detail || error.message || errorMessage;
+          } catch (e) {
+            errorMessage = chatResponse.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
+
+        const data = await chatResponse.json();
+        if (data.status === 'error') {
+          throw new Error(data.message || 'An error occurred');
+        }
+        
+        const responseText = data.response || data.message || 'I understand your question. Let me help you with that.';
+        addMessage('assistant', responseText);
       }
 
       // Clear images after processing
@@ -343,6 +393,10 @@ What would you like to start with?`,
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setErrorState(errorMessage);
+      setStreamingProgress(null);
+      
+      // Also add error message to chat for context
       let userFriendlyMessage = '❌ **I encountered an error processing your request.**\n\n';
       
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network')) {
@@ -366,85 +420,130 @@ What would you like to start with?`,
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] text-slate-800 relative overflow-hidden" role="main" aria-label="HealthScan Chat Assistant">
-      {/* Medical Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,132,199,0.05),transparent_50%)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(6,182,212,0.05),transparent_50%)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(5,150,105,0.03),transparent_50%)]"></div>
-      </div>
-
-      {/* HealthScan Header - Medical Theme */}
-      <div className="relative glass-strong border-b border-blue-200/50 px-4 py-3 md:py-4 backdrop-blur-xl z-10 flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-3">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 flex items-center justify-center text-xl md:text-2xl font-bold shadow-lg glow-teal flex-shrink-0">
-              🏥
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl font-bold gradient-text mb-0.5 truncate">HealthScan</h1>
-              <p className="text-xs text-slate-600 font-medium line-clamp-1">AI Healthcare Assistant • Prescription Extraction • Drug Interactions • Diet Recommendations</p>
-            </div>
-          </div>
-          <div className="mt-2">
-            <TrustIndicators />
-          </div>
-        </div>
-      </div>
-
-      {/* Chat Messages - Medical Theme */}
-      <div className="relative flex-1 overflow-y-auto p-3 md:p-4 lg:p-6 z-10 min-h-0" role="log" aria-live="polite" aria-label="Chat messages">
-        <div className="max-w-5xl mx-auto space-y-4">
-          {messages.map((msg, idx) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} message-enter`}
-              style={{ animationDelay: `${idx * 0.1}s` }}
-            >
-              <div
-                className={`max-w-[90%] sm:max-w-[85%] md:max-w-[75%] rounded-xl md:rounded-2xl p-4 md:p-5 shadow-md ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-blue-200/40'
-                    : 'medical-card bg-white text-slate-800 border-blue-200 shadow-blue-50'
-                }`}
-              >
-              {msg.image && (
-                <div className="mb-3 rounded-xl overflow-hidden border-2 border-blue-100 shadow-md">
-                  <img src={msg.image} alt="Uploaded prescription" className="max-w-xs w-full h-auto" />
-                </div>
-              )}
-              {msg.prescriptionData && (
-                <div className="mb-4">
-                  <PrescriptionCard prescription={msg.prescriptionData} />
-                </div>
-              )}
-              <div className="whitespace-pre-wrap leading-relaxed text-sm md:text-base prose prose-sm max-w-none">
-                {msg.content}
+    <div className="flex flex-col h-full w-full bg-slate-50" role="main" aria-label="HealthScan Chat Assistant">
+      {/* Main Content Container - Properly Contained */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          {/* Quick Actions Grid - Contained in Card */}
+          {messages.length === 1 && messages[0].role === 'assistant' && !loading && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">Get Started</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-white border-2 border-slate-200 rounded-lg p-4 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                >
+                  <div className="text-3xl mb-2">📋</div>
+                  <h3 className="font-semibold text-slate-900 mb-1">Scan Prescription</h3>
+                  <p className="text-sm text-slate-600">Upload prescription images</p>
+                </button>
+                <button
+                  onClick={() => router.push('/interactions')}
+                  className="bg-white border-2 border-slate-200 rounded-lg p-4 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors relative"
+                >
+                  <div className="text-3xl mb-2">💊</div>
+                  <h3 className="font-semibold text-slate-900 mb-1">Check Interactions</h3>
+                  <p className="text-sm text-slate-600">Check drug interactions</p>
+                </button>
+                <button
+                  onClick={() => router.push('/diet')}
+                  className="bg-white border-2 border-slate-200 rounded-lg p-4 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors relative"
+                >
+                  <div className="text-3xl mb-2">🥗</div>
+                  <h3 className="font-semibold text-slate-900 mb-1">Diet Portal</h3>
+                  <p className="text-sm text-slate-600">Get diet recommendations</p>
+                </button>
               </div>
-              <div className={`text-xs mt-3 font-medium opacity-70 ${msg.role === 'user' ? 'text-blue-50' : 'text-slate-500'}`}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <MedicalLoading variant="prescription" message="Analyzing your prescription..." />
             </div>
           )}
-          <div ref={messagesEndRef} />
+
+          {/* Chat Messages - Contained */}
+          <div className="space-y-4" role="log" aria-live="polite" aria-label="Chat messages">
+            {messages.map((msg, idx) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg p-4 ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border border-slate-200 text-slate-900'
+                  }`}
+                >
+                  {msg.image && (
+                    <div className="mb-3 rounded-lg overflow-hidden">
+                      <img src={msg.image} alt="Uploaded prescription" className="max-w-xs w-full h-auto" />
+                    </div>
+                  )}
+                  {msg.prescriptionData && (
+                    <div className="mb-3">
+                      <PrescriptionCard prescription={msg.prescriptionData} />
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap leading-relaxed text-sm md:text-base">
+                    {msg.content}
+                  </div>
+                  <div className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-slate-500'}`}>
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Status Messages - Contained, Not Overlaying */}
+          {streamingProgress && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <StreamingProgress 
+                step={streamingProgress.step}
+                progress={streamingProgress.progress}
+                message={streamingProgress.message}
+              />
+            </div>
+          )}
+          
+          {loading && !streamingProgress && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+              <div className="spinner w-5 h-5 border-2 border-blue-500 border-t-transparent"></div>
+              <span className="text-sm text-slate-700">Analyzing your prescription...</span>
+            </div>
+          )}
+          
+          {errorState && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-800 mb-1">Error</p>
+                  <p className="text-sm text-red-700 mb-3">{errorState}</p>
+                  <button
+                    onClick={() => {
+                      setErrorState(null);
+                      setStreamingProgress(null);
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Image Preview - Medical Theme */}
+      {/* Image Preview - Contained Section */}
       {images.length > 0 && (
-        <div className="relative glass-strong border-t border-blue-200/50 px-3 md:px-4 py-2 md:py-3 backdrop-blur-xl z-10 flex-shrink-0">
-          <div className="max-w-5xl mx-auto">
-            <p className="text-xs text-slate-600 font-semibold mb-2 uppercase tracking-wide">Prescription Images</p>
-            <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-thin">
+        <div className="border-t border-slate-200 bg-white px-4 sm:px-6 lg:px-8 py-3">
+          <div className="max-w-6xl mx-auto">
+            <p className="text-sm font-medium text-slate-700 mb-3">Prescription Images</p>
+            <div className="flex gap-3 overflow-x-auto pb-2">
               {imagePreviews.map((preview, idx) => (
-                <div key={idx} className="relative flex-shrink-0 group">
-                  <div className="relative w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-lg md:rounded-xl overflow-hidden border-2 border-blue-200 group-hover:border-blue-400 transition-all shadow-md medical-card">
+                <div key={idx} className="relative flex-shrink-0">
+                  <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border-2 border-slate-200">
                     <img src={preview} alt={`Prescription ${idx + 1}`} className="w-full h-full object-cover" />
                   </div>
                   <button
@@ -452,7 +551,7 @@ What would you like to start with?`,
                       setImages(prev => prev.filter((_, i) => i !== idx));
                       setImagePreviews(prev => prev.filter((_, i) => i !== idx));
                     }}
-                    className="absolute -top-1 -right-1 md:-top-2 md:-right-2 bg-red-500 hover:bg-red-600 rounded-full w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-xs font-bold shadow-lg transition-all hover:scale-110 text-white"
+                    className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 rounded-full w-6 h-6 flex items-center justify-center text-white text-xs font-bold shadow-md transition-colors"
                     aria-label="Remove image"
                   >
                     ×
@@ -464,88 +563,55 @@ What would you like to start with?`,
         </div>
       )}
 
-      {/* Quick Actions - Medical Theme */}
-      {images.length === 0 && messages.length <= 1 && (
-        <div className="relative px-3 md:px-4 pb-2 md:pb-3 z-10 flex-shrink-0">
-          <div className="max-w-5xl mx-auto">
-            <p className="text-xs text-slate-500 mb-2 font-semibold uppercase tracking-wider">Quick Actions</p>
-            <div className="flex gap-2 md:gap-3 flex-wrap">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold hover:shadow-xl transition-all flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg hover:from-blue-600 hover:to-cyan-600 transform hover:-translate-y-0.5"
-              >
-                <span className="text-base md:text-lg">📋</span>
-                <span className="hidden sm:inline">Upload Prescription</span>
-                <span className="sm:hidden">Upload</span>
-              </button>
-              <button
-                onClick={() => {
-                  setInput("What can HealthScan help me with?");
-                }}
-                className="medical-card px-4 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold hover:shadow-lg transition-all flex items-center gap-2 bg-white text-blue-600 border-blue-200 hover:border-blue-400 hover:bg-blue-50"
-              >
-                <span className="text-base md:text-lg">💡</span>
-                <span className="hidden sm:inline">Learn More</span>
-                <span className="sm:hidden">Learn</span>
-              </button>
-            </div>
+      {/* Input Area - Contained Section */}
+      <div className="border-t border-slate-200 bg-white px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-6xl mx-auto">
+          <form onSubmit={handleSend} className="flex gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-input"
+            />
+            <label
+              htmlFor="file-input"
+              className="px-4 py-3 rounded-lg cursor-pointer flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 min-w-[44px] min-h-[44px] transition-colors"
+              title="Upload prescription images"
+            >
+              <span className="text-lg">📷</span>
+            </label>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about medications, interactions, diet..."
+              className="flex-1 rounded-lg px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border border-slate-300 bg-white min-w-0 min-h-[44px] text-sm"
+              disabled={loading}
+              aria-label="Type your health question or message"
+            />
+            <button
+              type="submit"
+              disabled={loading || (!input.trim() && images.length === 0)}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm min-h-[44px] transition-colors"
+            >
+              {loading ? (
+                <>
+                  <div className="spinner w-4 h-4 border-2 border-white border-t-transparent inline-block mr-2"></div>
+                  <span className="hidden sm:inline">Sending...</span>
+                </>
+              ) : (
+                'Send'
+              )}
+            </button>
+          </form>
+          
+          {/* Medical Disclaimer */}
+          <div className="mt-3">
+            <MedicalDisclaimer variant="compact" />
           </div>
-        </div>
-      )}
-
-      {/* Input Area - Medical Theme */}
-      <div className="relative glass-strong border-t border-blue-200/50 p-3 md:p-4 backdrop-blur-xl z-10 flex-shrink-0">
-        <form onSubmit={handleSend} className="flex gap-2 md:gap-3 max-w-5xl mx-auto">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            id="file-input"
-          />
-          <label
-            htmlFor="file-input"
-            className="px-3 md:px-4 py-2.5 md:py-3 medical-card rounded-lg md:rounded-xl cursor-pointer flex items-center justify-center hover:shadow-lg transition-all bg-white border-blue-200 hover:border-blue-400 min-w-[44px] md:min-w-[50px] text-blue-600 hover:text-blue-700 flex-shrink-0"
-            title="Upload prescription images"
-          >
-            <span className="text-lg md:text-xl">📷</span>
-          </label>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about medications, interactions, diet..."
-            className="flex-1 medical-card rounded-lg md:rounded-xl px-3 md:px-4 lg:px-5 py-2.5 md:py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 border border-blue-200 focus:border-blue-400 transition-all text-sm md:text-base bg-white min-w-0"
-            disabled={loading}
-            aria-label="Type your health question or message"
-            aria-describedby="input-help"
-          />
-          <span id="input-help" className="sr-only">Enter your health questions or upload prescription images</span>
-          <button
-            type="submit"
-            disabled={loading || (!input.trim() && images.length === 0)}
-            className="px-4 md:px-6 lg:px-8 py-2.5 md:py-3 btn-primary rounded-lg md:rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none flex items-center gap-1 md:gap-2 min-w-[80px] md:min-w-[100px] justify-center text-white text-sm md:text-base flex-shrink-0"
-          >
-            {loading ? (
-              <>
-                <div className="spinner w-4 h-4 border-2 border-white border-t-transparent"></div>
-                <span className="hidden md:inline">Sending...</span>
-              </>
-            ) : (
-              <>
-                <span className="hidden sm:inline">Send</span>
-                <span className="sm:hidden">→</span>
-                <span className="hidden sm:inline text-lg">→</span>
-              </>
-            )}
-          </button>
-        </form>
-        
-        {/* Medical Disclaimer */}
-        <div className="px-3 md:px-4 pt-2 pb-1">
-          <MedicalDisclaimer variant="compact" />
         </div>
       </div>
     </div>

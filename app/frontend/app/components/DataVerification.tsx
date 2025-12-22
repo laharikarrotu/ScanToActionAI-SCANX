@@ -51,19 +51,19 @@ export default function DataVerification({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 rounded-lg border border-zinc-700 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-zinc-900 border-b border-zinc-700 p-6 z-10">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="medical-card glass-strong rounded-xl w-full max-w-[95vw] mx-auto max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 glass-strong border-b border-blue-200/50 p-6 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">🔍 Verify & Edit Extracted Data</h2>
-              <p className="text-zinc-400 text-sm">
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">🔍 Verify & Edit Extracted Data</h2>
+              <p className="text-slate-600 text-sm">
                 Review and correct any errors before the system submits the form
               </p>
             </div>
             <button
               onClick={onCancel}
-              className="text-zinc-400 hover:text-white text-2xl"
+              className="text-slate-500 hover:text-slate-800 text-2xl transition-colors"
             >
               ×
             </button>
@@ -73,36 +73,36 @@ export default function DataVerification({
         <div className="p-6 space-y-6">
           {/* Extracted Data Section */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">
               Extracted Data ({Object.keys(editedData).length} fields)
             </h3>
             <div className="space-y-3">
               {Object.entries(editedData).map(([id, element]) => (
-                <div key={id} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+                <div key={id} className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <div className="text-xs text-zinc-500 mb-1">ID: {id}</div>
-                      <div className="text-xs text-blue-400 mb-2">Type: {element.type}</div>
+                      <div className="text-xs text-slate-500 mb-1">ID: {id}</div>
+                      <div className="text-xs text-blue-600 mb-2 font-medium">Type: {element.type}</div>
                       
                       <div className="space-y-2">
                         <div>
-                          <label className="text-xs text-zinc-400 block mb-1">Label:</label>
+                          <label className="text-xs text-slate-600 block mb-1 font-medium">Label:</label>
                           <input
                             type="text"
                             value={element.label || ''}
                             onChange={(e) => handleDataEdit(id, 'label', e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                           />
                         </div>
                         
                         {element.value !== null && element.value !== undefined && (
                           <div>
-                            <label className="text-xs text-zinc-400 block mb-1">Value:</label>
+                            <label className="text-xs text-slate-600 block mb-1 font-medium">Value:</label>
                             <input
                               type="text"
                               value={element.value || ''}
                               onChange={(e) => handleDataEdit(id, 'value', e.target.value)}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                              className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                             />
                           </div>
                         )}
@@ -116,27 +116,27 @@ export default function DataVerification({
 
           {/* Action Plan Section */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">
               Action Plan ({editedSteps.length} steps)
             </h3>
-            <div className="bg-zinc-800 rounded-lg p-4 border border-zinc-700 mb-4">
-              <p className="text-sm text-zinc-300 mb-1">Task:</p>
-              <p className="text-white font-medium">{actionPlan.task}</p>
+            <div className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4 mb-4">
+              <p className="text-sm text-slate-600 mb-1 font-medium">Task:</p>
+              <p className="text-slate-800 font-semibold">{actionPlan.task}</p>
             </div>
             
             <div className="space-y-3">
               {editedSteps.map((step, idx) => (
-                <div key={idx} className="bg-zinc-800 rounded-lg p-4 border border-zinc-700">
+                <div key={idx} className="medical-card bg-blue-50 border-blue-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-blue-400 font-mono text-sm mt-1">{step.step}.</span>
+                    <span className="text-blue-600 font-mono text-sm mt-1 font-semibold">{step.step}.</span>
                     <div className="flex-1 space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-xs text-zinc-400 block mb-1">Action:</label>
+                          <label className="text-xs text-slate-600 block mb-1 font-medium">Action:</label>
                           <select
                             value={step.action}
                             onChange={(e) => handleStepEdit(idx, 'action', e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                           >
                             <option value="click">Click</option>
                             <option value="fill">Fill</option>
@@ -148,34 +148,34 @@ export default function DataVerification({
                         </div>
                         
                         <div>
-                          <label className="text-xs text-zinc-400 block mb-1">Target:</label>
+                          <label className="text-xs text-slate-600 block mb-1 font-medium">Target:</label>
                           <input
                             type="text"
                             value={step.target}
                             onChange={(e) => handleStepEdit(idx, 'target', e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                           />
                         </div>
                       </div>
                       
                       {step.action === 'fill' && (
                         <div>
-                          <label className="text-xs text-zinc-400 block mb-1">Value:</label>
+                          <label className="text-xs text-slate-600 block mb-1 font-medium">Value:</label>
                           <input
                             type="text"
                             value={step.value || ''}
                             onChange={(e) => handleStepEdit(idx, 'value', e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                           />
                         </div>
                       )}
                       
                       <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Description:</label>
+                        <label className="text-xs text-slate-600 block mb-1 font-medium">Description:</label>
                         <textarea
                           value={step.description || ''}
                           onChange={(e) => handleStepEdit(idx, 'description', e.target.value)}
-                          className="w-full bg-zinc-900 border border-zinc-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                          className="w-full medical-card border border-blue-200 rounded-lg px-3 py-2 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
                           rows={2}
                         />
                       </div>
@@ -187,16 +187,16 @@ export default function DataVerification({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-zinc-700">
+          <div className="flex gap-3 pt-4 border-t border-blue-200">
             <button
               onClick={onCancel}
-              className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+              className="flex-1 medical-card bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-6 rounded-xl transition-colors border border-slate-300"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirm}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+              className="flex-1 btn-primary text-white font-medium py-3 px-6 rounded-xl transition-all"
             >
               ✓ Confirm & Execute
             </button>

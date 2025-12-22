@@ -6,6 +6,7 @@ import type { InteractionCheckResponse, InteractionWarning, PrescriptionDetail }
 import ProgressTracker from './ProgressTracker';
 import { useHealthScan } from '../context/HealthScanContext';
 import { API_BASE_URL } from '../lib/api';
+import { safeStorage } from '../lib/storage';
 import MedicalDisclaimer from './MedicalDisclaimer';
 
 export default function InteractionChecker() {
@@ -87,17 +88,37 @@ export default function InteractionChecker() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to check interactions');
+        let errorMessage = 'Failed to check interactions';
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || error.message || errorMessage;
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      
+      // Validate response structure
+      if (data.status === 'error') {
+        throw new Error(data.message || 'An error occurred while checking interactions');
+      }
+      
+      // Ensure we have the expected fields - backend provides both 'warnings' and 'interactions'
+      const warnings = data.warnings || data.interactions || { major: [], moderate: [], minor: [] };
+      const prescriptionDetails = data.prescription_details || data.prescriptions || [];
+      
+      if (!warnings || (!prescriptionDetails.length && data.medications_found === 0)) {
+        throw new Error('Invalid response format from server');
+      }
+      
       setResult(data);
       
       // Store in context
       setInteractionResult({
-        warnings: data.warnings || { major: [], moderate: [], minor: [] },
-        prescription_details: data.prescription_details || [],
+        warnings: warnings,
+        prescription_details: prescriptionDetails,
       });
       
       clearErrors();
@@ -127,26 +148,26 @@ export default function InteractionChecker() {
   };
 
   return (
-    <div className="min-h-screen text-slate-800 relative overflow-hidden">
+    <div className="h-full w-full text-slate-800 relative overflow-y-auto">
       {/* Medical Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(2,132,199,0.05),transparent_50%)]"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(6,182,212,0.05),transparent_50%)]"></div>
       </div>
 
-      <div className="relative max-w-5xl mx-auto p-4 md:p-6 z-10">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 mb-4 shadow-lg glow-teal medical-card">
-            <span className="text-3xl">💊</span>
+      <div className="relative w-full mx-auto px-6 md:px-10 py-4 md:py-6 z-10">
+        <div className="mb-6 sm:mb-8 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500 mb-4 shadow-lg glow-teal medical-card">
+            <span className="text-2xl sm:text-3xl">💊</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 gradient-text">Drug Interaction Checker</h1>
-          <p className="text-slate-600 font-medium">HealthScan's unique feature - Check multiple prescriptions for interactions</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 gradient-text">Drug Interaction Checker</h1>
+          <p className="text-sm sm:text-base text-slate-600 font-medium px-2">HealthScan's unique feature - Check multiple prescriptions for interactions</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6" aria-label="Drug interaction checker form">
           {/* Multi-Image Upload */}
-          <div className="medical-card p-6">
-            <h2 className="text-xl font-semibold mb-4 text-slate-800">1. Upload Prescription Images</h2>
+          <div className="medical-card p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800">1. Upload Prescription Images</h2>
             
             {imagePreviews.length > 0 ? (
               <div className="space-y-4">
@@ -194,14 +215,14 @@ export default function InteractionChecker() {
           </div>
 
           {/* Allergies Input */}
-          <div className="medical-card p-6">
-            <h2 className="text-xl font-semibold mb-4 text-slate-800">2. Known Allergies (Optional)</h2>
+          <div className="medical-card p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800">2. Known Allergies (Optional)</h2>
             <input
               type="text"
               value={allergies}
               onChange={(e) => setAllergies(e.target.value)}
               placeholder="e.g., Penicillin, Aspirin, Ibuprofen (comma-separated)"
-              className="w-full medical-card border border-blue-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all"
+              className="w-full medical-card border border-blue-200 rounded-xl px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 transition-all min-h-[44px]"
               aria-label="Enter known allergies"
             />
             <p className="text-xs text-slate-500 mt-2">This helps us check for drug-allergy interactions</p>
@@ -211,7 +232,7 @@ export default function InteractionChecker() {
           <button
             type="submit"
             disabled={loading || images.length === 0}
-            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[44px]"
             aria-label={loading ? "Checking interactions" : `Check ${images.length} prescription${images.length > 1 ? 's' : ''}`}
           >
             {loading ? (
@@ -358,12 +379,11 @@ export default function InteractionChecker() {
                     onClick={() => {
                       const medNames = result.prescription_details?.map((p: PrescriptionDetail) => p.medication_name).filter(Boolean).join(', ') || '';
                       if (medNames) {
-                        localStorage.setItem('current_medications', medNames);
+                        safeStorage.setItem('current_medications', medNames);
                       }
                       navigateToDiet();
-                      router.push('/diet');
                     }}
-                    className="flex-1 btn-medical-success text-white font-semibold py-3 px-4 rounded-xl transition-all"
+                    className="flex-1 btn-primary text-white font-semibold py-3 px-4 rounded-xl transition-all min-h-[44px]"
                     aria-label="Get diet advice based on medications"
                   >
                     🥗 Get Diet Advice
