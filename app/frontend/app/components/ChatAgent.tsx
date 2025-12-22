@@ -159,7 +159,7 @@ Your AI-powered healthcare assistant. Get started by choosing an action below.`,
       addMessage('assistant', message);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to check interactions';
-      addMessage('assistant', `❌ **Error:** ${errorMsg}\n\nPlease check your connection and try again.`, undefined, undefined, true);
+      addMessage('assistant', `❌ **Error:** ${errorMsg}\n\nPlease check your connection and try again.`);
       setErrorState(errorMsg);
     } finally {
       setLoading(false);
