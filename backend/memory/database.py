@@ -27,7 +27,7 @@ if db_settings.database_url.startswith("postgresql"):
         max_overflow=20,  # Additional connections beyond pool_size
         pool_recycle=3600,  # Recycle connections after 1 hour
         pool_timeout=30,  # Timeout for getting connection from pool
-        echo=False  # Set to True for SQL query logging
+        echo=os.getenv("SQL_ECHO", "false").lower() == "true"  # Enable query logging via SQL_ECHO env var
     )
 else:
     # SQLite fallback (not recommended for production)
@@ -48,6 +48,18 @@ class ScanRequest(Base):
     session_id = Column(String, index=True, nullable=True)
     image_hash = Column(String, index=True)
     intent = Column(Text)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    user_id = Column(String, index=True, nullable=True)
+    action = Column(String, index=True)  # view, upload, download, delete, modify, extract, process
+    resource_type = Column(String, index=True)  # prescription, image, medical_record
+    resource_id = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    additional_info = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class UISchema(Base):

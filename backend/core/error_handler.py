@@ -207,16 +207,66 @@ class ErrorHandler:
         return ErrorCategory.UNKNOWN
     
     @staticmethod
-    def get_user_friendly_error(error: Exception) -> str:
+    def sanitize_error_message(error: Exception, is_production: bool = True) -> str:
+        """
+        Sanitize error message to prevent information disclosure.
+        
+        Removes:
+        - File paths
+        - Database connection strings
+        - API keys
+        - Stack traces
+        - Internal system details
+        
+        Args:
+            error: Exception to sanitize
+            is_production: If True, use generic messages (default: True)
+            
+        Returns:
+            Sanitized error message safe for client
+        """
+        import os
+        import re
+        
+        # Check if we're in production
+        if not is_production:
+            is_production = os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production"
+        
+        error_str = str(error)
+        
+        # In production, never expose raw error messages
+        if is_production:
+            # Remove file paths
+            error_str = re.sub(r'[a-zA-Z]:\\[^\s]+|/[^\s]+\.(py|js|ts|json|env)', '[file]', error_str)
+            # Remove potential connection strings
+            error_str = re.sub(r'(postgresql|mysql|mongodb)://[^\s]+', '[database]', error_str, flags=re.IGNORECASE)
+            # Remove API keys (common patterns)
+            error_str = re.sub(r'(api[_-]?key|secret|token|password)\s*[:=]\s*[\w-]+', r'\1=[REDACTED]', error_str, flags=re.IGNORECASE)
+            # Remove email addresses
+            error_str = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[email]', error_str)
+            # Remove IP addresses
+            error_str = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[ip]', error_str)
+            # Remove stack trace indicators
+            error_str = re.sub(r'Traceback.*?File.*?line \d+', '[stack trace]', error_str, flags=re.DOTALL)
+        
+        return error_str
+    
+    @staticmethod
+    def get_user_friendly_error(error: Exception, is_production: bool = True) -> str:
         """
         Convert technical errors to user-friendly messages
         
         Args:
             error: Exception to convert
+            is_production: If True, use generic messages (default: True)
             
         Returns:
-            User-friendly error message
+            User-friendly error message (sanitized)
         """
+        import os
+        if not is_production:
+            is_production = os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production"
+        
         category = ErrorHandler.categorize_error(error)
         error_str = str(error).lower()
         
@@ -233,14 +283,20 @@ class ErrorHandler:
             ErrorCategory.UNKNOWN: "An error occurred. Please try again or contact support if the problem persists."
         }
         
-        # Special handling for specific error types
-        if "image" in error_str or "blurry" in error_str:
-            return "Image quality issue. Please use a clearer image."
+        # In production, always return generic message
+        if is_production:
+            # Special handling for specific error types (but still generic)
+            if "image" in error_str or "blurry" in error_str or "pdf" in error_str:
+                return "Image processing error. Please use a clearer image or try a different file format."
+            
+            if "file" in error_str or "upload" in error_str:
+                return "File upload error. Please check the file format and size, then try again."
+            
+            return error_messages.get(category, error_messages[ErrorCategory.UNKNOWN])
         
-        if "file" in error_str or "upload" in error_str:
-            return "File upload error. Please try a different image."
-        
-        return error_messages.get(category, error_messages[ErrorCategory.UNKNOWN])
+        # In development, can be slightly more specific (but still sanitized)
+        sanitized = ErrorHandler.sanitize_error_message(error, is_production=False)
+        return sanitized[:200]  # Limit length
     
     @staticmethod
     def log_error(error: Exception, context: Optional[Dict[str, Any]] = None):

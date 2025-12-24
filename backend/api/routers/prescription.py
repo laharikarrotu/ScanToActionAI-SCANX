@@ -13,7 +13,8 @@ from api.dependencies import (
     prescription_extractor, pdf_processor, audit_logger,
     CACHE_AVAILABLE, cache_manager,
     track_llm_api_call, track_prescription_extraction,
-    track_cache_hit, track_cache_miss, ErrorHandler
+    track_cache_hit, track_cache_miss, ErrorHandler,
+    rate_limiter, pii_redactor
 )
 from core.logger import get_logger
 
@@ -44,9 +45,45 @@ async def extract_prescription_direct(
     - All image uploads are logged for audit
     - Images can be encrypted at rest (configurable)
     """
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Please try again in a moment. ({remaining} requests remaining)"
+        )
+    
     try:
+        # Security: Validate file size
+        file_size_mb = file.size / (1024 * 1024) if file.size else 0
+        if file_size_mb > settings.max_file_size_mb:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large: {file_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+            )
+        
+        # Security: Validate file type
+        allowed_content_types = [
+            "image/jpeg", "image/jpg", "image/png", "image/webp",
+            "application/pdf", "image/heic", "image/heif"
+        ]
+        if file.content_type and file.content_type not in allowed_content_types:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type: {file.content_type}. Allowed types: {', '.join(allowed_content_types)}"
+            )
+        
         # Read file data
         file_data = await file.read()
+        
+        # Security: Validate actual file size after reading (prevent decompression bombs)
+        actual_size_mb = len(file_data) / (1024 * 1024)
+        if actual_size_mb > settings.max_file_size_mb:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large after processing: {actual_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+            )
         
         # Check if it's a PDF
         if pdf_processor.is_pdf(file_data):
@@ -62,7 +99,9 @@ async def extract_prescription_direct(
                     logger.warning(f"PDF has {len(pdf_images)} pages. Only processing first page. Consider using multi-page endpoint.")
             except Exception as e:
                 logger.error(f"PDF processing failed: {str(e)}")
-                raise HTTPException(status_code=400, detail=f"PDF processing failed: {str(e)}")
+                from core.error_handler import ErrorHandler
+                user_msg = ErrorHandler.get_user_friendly_error(e)
+                raise HTTPException(status_code=400, detail=user_msg)
         else:
             image_data = file_data
         
@@ -100,6 +139,22 @@ async def extract_prescription_direct(
                 await asyncio.sleep(0.1)
                 
                 yield f"data: {json.dumps({'step': 'analyzing', 'progress': 60, 'message': 'Analyzing prescription with AI...'})}\n\n"
+                
+                # Security: Redact PII from image before sending to LLM
+                try:
+                    from vision.ocr_preprocessor import OCRPreprocessor
+                    ocr_preprocessor = OCRPreprocessor(enable_pii_redaction=True)
+                    ocr_result = ocr_preprocessor.extract_text(image_data, preprocess=True)
+                    
+                    if ocr_result.get('pii_detected', False):
+                        logger.warning(f"PII detected: {ocr_result.get('pii_count', 0)} instances. Redacting before LLM.")
+                        redacted_image, redaction_count = pii_redactor.redact_image(
+                            image_data, ocr_text=ocr_result.get('original_text'), use_ocr=True
+                        )
+                        if redaction_count > 0:
+                            image_data = redacted_image
+                except Exception as e:
+                    logger.warning(f"PII redaction failed: {e}. Proceeding (security risk).")
                 
                 start_time = time.time()
                 try:
@@ -167,12 +222,15 @@ async def extract_prescription_direct(
             duration = time.time() - start_time
             track_llm_api_call("gemini", "gemini-1.5-pro", duration, False)
             track_prescription_extraction(False)
-            raise HTTPException(status_code=400, detail=str(e))
+            from core.error_handler import ErrorHandler
+            user_msg = ErrorHandler.get_user_friendly_error(e)
+            raise HTTPException(status_code=400, detail=user_msg)
         except Exception as e:
             duration = time.time() - start_time
             track_llm_api_call("gemini", "gemini-1.5-pro", duration, False)
             track_prescription_extraction(False)
             ErrorHandler.log_error(e, {"endpoint": "extract-prescription"})
+            # Sanitize error message for production
             user_friendly_msg = ErrorHandler.get_user_friendly_error(e)
             raise HTTPException(status_code=500, detail=user_friendly_msg)
         

@@ -40,7 +40,12 @@ async def execute_verified_plan(
         )
         
         # Execute with verified plan
-        executor = BrowserExecutor(headless=True)
+        # Parse allowed domains for SSRF protection
+        from api.config import settings
+        allowed_domains_list = None
+        if settings.allowed_domains:
+            allowed_domains_list = [domain.strip() for domain in settings.allowed_domains.split(",") if domain.strip()]
+        executor = BrowserExecutor(headless=True, allowed_domains=allowed_domains_list)
         try:
             result = await executor.execute_plan(
                 steps=plan.steps,

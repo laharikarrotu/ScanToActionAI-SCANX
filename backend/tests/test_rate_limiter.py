@@ -1,5 +1,17 @@
 """
 Unit tests for rate limiter
+
+This test suite verifies the RateLimiter class which provides:
+- Per-user/IP rate limiting
+- Request counting within time windows
+- Blocking excess requests
+- Manual reset functionality
+
+Each test function is documented with:
+- Purpose: What it tests and why it's important for security and cost control
+- What it verifies: Rate limit enforcement, per-user isolation, reset behavior
+- Why it matters: Prevents abuse, DoS attacks, and API cost overruns
+- What to modify: Guidance if rate limit calculation or window logic changes
 """
 import pytest
 import sys

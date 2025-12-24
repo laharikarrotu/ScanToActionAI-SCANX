@@ -6,8 +6,7 @@ from fastapi.responses import JSONResponse
 import re
 
 from api.config import settings
-from api.auth import create_access_token, verify_token
-from api.oauth_auth import get_current_user as get_oauth_user
+from api.auth import create_access_token, verify_token, get_oauth_user
 from api.rate_limiter import RateLimiter
 from core.logger import get_logger
 

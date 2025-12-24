@@ -8,7 +8,8 @@ import re
 
 from api.config import settings
 from api.dependencies import (
-    diet_advisor, CACHE_AVAILABLE, cache_manager
+    diet_advisor, CACHE_AVAILABLE, cache_manager,
+    rate_limiter
 )
 from core.error_handler import ErrorHandler
 from core.logger import get_logger
@@ -18,6 +19,7 @@ router = APIRouter(prefix="", tags=["nutrition"])
 
 @router.post("/get-diet-recommendations")
 async def get_diet_recommendations(
+    request: Request,
     condition: str = Form(...),
     medications: Optional[str] = Form(None),
     dietary_restrictions: Optional[str] = Form(None)
@@ -100,6 +102,7 @@ async def get_diet_recommendations(
 
 @router.post("/check-food-compatibility")
 async def check_food_compatibility(
+    request: Request,
     food_item: str = Form(...),
     condition: Optional[str] = Form(None),
     medications: Optional[str] = Form(None)
@@ -115,6 +118,15 @@ async def check_food_compatibility(
     **Returns:**
     - `compatibility`: Safety status, warnings, recommendations
     """
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Please try again in a moment. ({remaining} requests remaining)"
+        )
+    
     # Input validation and sanitization
     food_item = food_item.strip()[:100]
     if not food_item:
@@ -158,6 +170,7 @@ async def check_food_compatibility(
 
 @router.post("/generate-meal-plan")
 async def generate_meal_plan(
+    request: Request,
     condition: str = Form(...),
     days: int = Form(7),
     dietary_restrictions: Optional[str] = Form(None)

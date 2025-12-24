@@ -3,6 +3,8 @@ Configuration settings for the API
 """
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
+import secrets
 
 class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
@@ -40,4 +42,25 @@ class Settings(BaseSettings):
         extra = "ignore"  # Ignore extra fields in .env that aren't in this class
 
 settings = Settings()
+
+# Security: Validate JWT secret is not default value
+DEFAULT_JWT_SECRET = "change-me-in-production"
+if settings.jwt_secret == DEFAULT_JWT_SECRET:
+    # In production, fail immediately
+    if os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production":
+        raise ValueError(
+            "CRITICAL SECURITY ERROR: JWT_SECRET is set to default value 'change-me-in-production'. "
+            "This is not allowed in production. Please set a strong, random JWT_SECRET in your .env file."
+        )
+    else:
+        # In development, generate a random secret and warn
+        import warnings
+        warnings.warn(
+            f"⚠️  SECURITY WARNING: JWT_SECRET is set to default value. "
+            f"Generated random secret for this session only. "
+            f"Set JWT_SECRET in .env file for production use.",
+            UserWarning
+        )
+        # Generate a temporary random secret (not persisted)
+        settings.jwt_secret = secrets.token_urlsafe(32)
 

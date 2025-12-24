@@ -142,11 +142,12 @@ food_scanner = FoodScanner(api_key=None, use_gemini=True)
 logger.info("Food Scanner using Gemini Pro 1.5")
 
 # Rate limiter selection (priority: Redis > Database > Token Bucket > In-Memory)
-rate_limiter: Optional[RateLimiter] = None
+# Use factory function to get best available rate limiter
+rate_limiter: Optional[object] = get_rate_limiter(preferred="redis")
 
-if REDIS_RATE_LIMITER_AVAILABLE and RedisRateLimiter:
-    try:
-        rate_limiter = RedisRateLimiter()
+# Fallback to simple in-memory if factory returns None
+if rate_limiter is None:
+    rate_limiter = InMemoryRateLimiter()
         logger.info("Using Redis rate limiter")
     except Exception as e:
         logger.warning(f"Redis rate limiter failed: {e}, trying database...", exception=e)

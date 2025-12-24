@@ -12,6 +12,7 @@ import re
 from api.config import settings
 from api.dependencies import (
     rate_limiter, pdf_processor, audit_logger, event_logger,
+    pii_redactor,
     USE_COMBINED_ANALYZER, combined_analyzer, vision_engine, planner_engine,
     prescription_extractor, CACHE_AVAILABLE, cache_manager,
     CIRCUIT_BREAKER_AVAILABLE, gemini_circuit_breaker
@@ -62,8 +63,35 @@ async def analyze_and_execute(
         
         intent = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', intent)
         
+        # Security: Validate file size
+        file_size_mb = file.size / (1024 * 1024) if file.size else 0
+        if file_size_mb > settings.max_file_size_mb:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large: {file_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+            )
+        
+        # Security: Validate file type
+        allowed_content_types = [
+            "image/jpeg", "image/jpg", "image/png", "image/webp",
+            "application/pdf", "image/heic", "image/heif"
+        ]
+        if file.content_type and file.content_type not in allowed_content_types:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type: {file.content_type}. Allowed types: {', '.join(allowed_content_types)}"
+            )
+        
         # Read and validate file
         file_data = await file.read()
+        
+        # Security: Validate actual file size after reading (prevent decompression bombs)
+        actual_size_mb = len(file_data) / (1024 * 1024)
+        if actual_size_mb > settings.max_file_size_mb:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large after processing: {actual_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+            )
         
         # Check if it's a PDF
         if pdf_processor.is_pdf(file_data):
@@ -74,14 +102,36 @@ async def analyze_and_execute(
                 image_data = pdf_images[0]
                 logger.info(f"PDF detected: {len(pdf_images)} pages, processing first page")
             except Exception as e:
-                logger.error(f"PDF processing failed: {str(e)}")
-                raise HTTPException(status_code=400, detail=f"PDF processing failed: {str(e)}")
+                logger.error(f"PDF processing failed: {str(e)}", exc_info=True)
+                # Sanitize error message to prevent information disclosure
+                from core.error_handler import ErrorHandler
+                user_msg = ErrorHandler.get_user_friendly_error(e)
+                raise HTTPException(status_code=400, detail=user_msg)
         else:
             image_data = file_data
         
         # HIPAA Compliance: Log image upload
         image_hash = hashlib.sha256(image_data).hexdigest()
         audit_logger.log_image_upload(user_id=None, image_hash=image_hash, ip_address=client_ip)
+        
+        # Security: Redact PII from image before sending to LLM
+        try:
+            from vision.ocr_preprocessor import OCRPreprocessor
+            ocr_preprocessor = OCRPreprocessor(enable_pii_redaction=True)
+            ocr_result = ocr_preprocessor.extract_text(image_data, preprocess=True)
+            
+            if ocr_result.get('pii_detected', False):
+                logger.warning(f"PII detected in image: {ocr_result.get('pii_count', 0)} instances. Redacting before LLM processing.")
+                redacted_image, redaction_count = pii_redactor.redact_image(
+                    image_data, 
+                    ocr_text=ocr_result.get('original_text'),
+                    use_ocr=True
+                )
+                if redaction_count > 0:
+                    image_data = redacted_image
+                    logger.info(f"Image redacted: {redaction_count} PII regions removed before LLM analysis")
+        except Exception as e:
+            logger.warning(f"PII redaction failed: {e}. Proceeding with original image (security risk).")
         
         # Check file size
         max_file_size = settings.max_file_size_mb * 1024 * 1024
@@ -219,9 +269,11 @@ async def analyze_and_execute(
                 track_llm_api_call("gemini", "gemini-1.5-pro", duration, False)
                 track_vision_analysis(False)
                 logger.error(f"Vision analysis error: {str(e)}", exception=e, context={"endpoint": "analyze-and-execute", "step": "vision"})
+                from core.error_handler import ErrorHandler
+                user_msg = ErrorHandler.get_user_friendly_error(e)
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Vision analysis failed: {str(e)}. Please check your API key and credits."
+                    detail=user_msg
                 )
             
             # Step 2: Planning
@@ -311,7 +363,12 @@ async def analyze_and_execute(
             )
         
         # Step 3: Execution
-        executor = BrowserExecutor(headless=True)
+        # Parse allowed domains for SSRF protection
+        from api.config import settings
+        allowed_domains_list = None
+        if settings.allowed_domains:
+            allowed_domains_list = [domain.strip() for domain in settings.allowed_domains.split(",") if domain.strip()]
+        executor = BrowserExecutor(headless=True, allowed_domains=allowed_domains_list)
         try:
             start_url = ui_schema.url_hint
             

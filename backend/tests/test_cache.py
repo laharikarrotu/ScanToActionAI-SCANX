@@ -1,5 +1,18 @@
 """
 Unit tests for cache module
+
+This test suite verifies the CacheManager class which provides:
+- Multi-level caching (Redis with memory fallback)
+- Cache operations (set, get, delete, expiration)
+- Prescription caching (by image hash)
+- Interaction caching (by medication + allergy hash)
+- Diet recommendation caching (by condition + medications + restrictions)
+
+Each test function is documented with:
+- Purpose: What it tests and why it's important for performance
+- What it verifies: Cache operations, TTL enforcement, fallback behavior
+- Why it matters: Reduces API costs, improves response times, handles Redis outages
+- What to modify: Guidance if cache key formats or TTL logic changes
 """
 import pytest
 import sys

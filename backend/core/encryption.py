@@ -28,20 +28,37 @@ class ImageEncryption:
     Uses Fernet (AES-128 in CBC mode) with PBKDF2 key derivation
     """
     
-    def __init__(self, encryption_key: Optional[str] = None):
+    def __init__(self, encryption_key: Optional[str] = None, require_encryption: bool = True):
         """
-        Initialize encryption with key from environment or generate new
+        Initialize encryption with key from environment.
+        
+        Args:
+            encryption_key: Encryption key (optional, reads from ENCRYPTION_KEY env var)
+            require_encryption: If True, fail if encryption not available (default: True for security)
         """
+        self.salt = None  # Store salt for decryption (in production, store with encrypted data)
         if not CRYPTOGRAPHY_AVAILABLE:
+            if require_encryption:
+                raise RuntimeError(
+                    "CRITICAL: Encryption is required but cryptography library is not available. "
+                    "Install it with: pip install cryptography"
+                )
             logger.warning("Cryptography not available. Encryption features disabled.")
             self.cipher = None
             self.encryption_key = None
             return
             
         self.encryption_key = encryption_key or os.getenv("ENCRYPTION_KEY")
+        is_production = os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production"
         
         if not self.encryption_key:
-            # Generate a key (in production, use a key management service)
+            if require_encryption and is_production:
+                raise ValueError(
+                    "CRITICAL SECURITY ERROR: ENCRYPTION_KEY is not set. "
+                    "Encryption is mandatory for medical data. "
+                    "Please set ENCRYPTION_KEY in your .env file with a strong, random key."
+                )
+            # In development, generate a key and warn
             logger.warning("No ENCRYPTION_KEY found. Generating temporary key. NOT SECURE FOR PRODUCTION!")
             self.encryption_key = Fernet.generate_key().decode()
             logger.warning("Set ENCRYPTION_KEY in .env for production use")
@@ -54,24 +71,35 @@ class ImageEncryption:
                     self.encryption_key = self.encryption_key.encode()
                 except:
                     # Derive key from password using PBKDF2
+                    # Security: Generate random salt per encryption instance
+                    # In production, should use random salt per user/record and store with encrypted data
+                    import secrets
+                    random_salt = secrets.token_bytes(16)  # 16 bytes = 128 bits of entropy
                     kdf = PBKDF2HMAC(
                         algorithm=hashes.SHA256(),
                         length=32,
-                        salt=b'healthscan_salt',  # In production, use random salt per user
+                        salt=random_salt,  # Random salt for better security
                         iterations=100000,
                         backend=default_backend()
                     )
                     self.encryption_key = base64.urlsafe_b64encode(kdf.derive(self.encryption_key.encode()))
+                    # Store salt for decryption (in production, store with encrypted data)
+                    self.salt = random_salt
         
         self.cipher = Fernet(self.encryption_key)
     
     def encrypt_image(self, image_data: bytes) -> bytes:
         """
         Encrypt image data before storage
+        
+        Raises:
+            RuntimeError: If encryption is not available (cipher not initialized)
         """
         if not self.cipher:
-            logger.warning("Encryption not available. Returning unencrypted data.")
-            return image_data
+            raise RuntimeError(
+                "CRITICAL: Cannot encrypt image - encryption not available. "
+                "This should not happen if encryption was properly initialized."
+            )
         try:
             encrypted_data = self.cipher.encrypt(image_data)
             logger.info(f"Encrypted image: {len(image_data)} bytes → {len(encrypted_data)} bytes")
@@ -83,10 +111,15 @@ class ImageEncryption:
     def decrypt_image(self, encrypted_data: bytes) -> bytes:
         """
         Decrypt image data for processing
+        
+        Raises:
+            RuntimeError: If decryption is not available (cipher not initialized)
         """
         if not self.cipher:
-            logger.warning("Decryption not available. Returning data as-is.")
-            return encrypted_data
+            raise RuntimeError(
+                "CRITICAL: Cannot decrypt image - decryption not available. "
+                "This should not happen if encryption was properly initialized."
+            )
         try:
             decrypted_data = self.cipher.decrypt(encrypted_data)
             logger.info(f"Decrypted image: {len(encrypted_data)} bytes → {len(decrypted_data)} bytes")

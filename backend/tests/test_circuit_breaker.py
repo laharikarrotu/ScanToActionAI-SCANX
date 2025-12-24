@@ -1,10 +1,23 @@
 """
 Unit tests for circuit breaker module
+
+This test suite verifies the CircuitBreaker class which provides:
+- Circuit breaker pattern for external API resilience
+- State management (CLOSED, OPEN, HALF_OPEN)
+- Failure threshold detection
+- Automatic recovery after timeout
+- Prevents cascading failures
+
+Each test function is documented with:
+- Purpose: What it tests and why it's important for system resilience
+- What it verifies: State transitions, failure handling, recovery logic
+- Why it matters: Prevents overwhelming failing services, provides fast failure
+- What to modify: Guidance if circuit breaker thresholds or recovery logic changes
 """
 import pytest
 import sys
 import os
-import time
+from datetime import datetime
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -71,8 +84,9 @@ class TestCircuitBreaker:
     
     def test_open_circuit_rejects_immediately(self):
         """Test that open circuit rejects calls immediately"""
-        cb = CircuitBreaker(name="test", failure_threshold=1)
+        cb = CircuitBreaker(name="test", failure_threshold=1, recovery_timeout=100)
         cb.state = CircuitState.OPEN
+        cb.last_failure_time = datetime.now()  # Just failed, so recovery timeout not met
         
         def any_func():
             return "should not execute"
@@ -80,13 +94,14 @@ class TestCircuitBreaker:
         with pytest.raises(Exception) as exc_info:
             cb.call(any_func)
         
-        assert "circuit is open" in str(exc_info.value).lower() or "circuit breaker" in str(exc_info.value).lower()
+        assert "circuit" in str(exc_info.value).lower() and "open" in str(exc_info.value).lower()
     
     def test_circuit_enters_half_open_after_timeout(self):
         """Test that circuit enters half-open state after recovery timeout"""
+        from datetime import timedelta
         cb = CircuitBreaker(name="test", failure_threshold=1, recovery_timeout=1)
         cb.state = CircuitState.OPEN
-        cb.last_failure_time = time.time() - 2  # 2 seconds ago
+        cb.last_failure_time = datetime.now() - timedelta(seconds=2)  # 2 seconds ago (datetime, not float)
         
         def success_func():
             return "success"

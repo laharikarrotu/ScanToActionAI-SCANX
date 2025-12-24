@@ -10,7 +10,8 @@ import hashlib
 from api.config import settings
 from api.dependencies import (
     prescription_extractor, interaction_checker, audit_logger,
-    CACHE_AVAILABLE, cache_manager
+    CACHE_AVAILABLE, cache_manager,
+    rate_limiter
 )
 from core.error_handler import ErrorHandler
 from medication.interaction_checker import Medication
@@ -45,6 +46,15 @@ async def check_prescription_interactions(
     - `interactions`: Categorized by severity (major, moderate, minor)
     - `has_interactions`: Boolean indicating if any interactions found
     """
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, remaining = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Please try again in a moment. ({remaining} requests remaining)"
+        )
+    
     # Security: Limit number of files to prevent DoS
     if len(files) > settings.max_file_count:
         raise HTTPException(
@@ -59,7 +69,34 @@ async def check_prescription_interactions(
         
         # Process files in parallel for better performance
         async def process_file(file: UploadFile):
+            # Security: Validate file size
+            file_size_mb = file.size / (1024 * 1024) if file.size else 0
+            if file_size_mb > settings.max_file_size_mb:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File '{file.filename}' too large: {file_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+                )
+            
+            # Security: Validate file type
+            allowed_content_types = [
+                "image/jpeg", "image/jpg", "image/png", "image/webp",
+                "application/pdf", "image/heic", "image/heif"
+            ]
+            if file.content_type and file.content_type not in allowed_content_types:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"Unsupported file type for '{file.filename}': {file.content_type}. Allowed types: {', '.join(allowed_content_types)}"
+                )
+            
             image_data = await file.read()
+            
+            # Security: Validate actual file size after reading
+            actual_size_mb = len(image_data) / (1024 * 1024)
+            if actual_size_mb > settings.max_file_size_mb:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File '{file.filename}' too large after processing: {actual_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB"
+                )
             image_hash = hashlib.sha256(image_data).hexdigest()
             
             cached_prescription = None
@@ -70,6 +107,22 @@ async def check_prescription_interactions(
                 prescription = PrescriptionInfo(**cached_prescription)
                 logger.info(f"Using cached prescription for {image_hash[:8]}...", context={"cache": "hit", "image_hash": image_hash[:8]})
             else:
+                # Security: Redact PII from image before sending to LLM
+                try:
+                    from vision.ocr_preprocessor import OCRPreprocessor
+                    ocr_preprocessor = OCRPreprocessor(enable_pii_redaction=True)
+                    ocr_result = ocr_preprocessor.extract_text(image_data, preprocess=True)
+                    
+                    if ocr_result.get('pii_detected', False):
+                        logger.warning(f"PII detected: {ocr_result.get('pii_count', 0)} instances. Redacting before LLM.")
+                        redacted_image, redaction_count = pii_redactor.redact_image(
+                            image_data, ocr_text=ocr_result.get('original_text'), use_ocr=True
+                        )
+                        if redaction_count > 0:
+                            image_data = redacted_image
+                except Exception as e:
+                    logger.warning(f"PII redaction failed: {e}. Proceeding (security risk).")
+                
                 prescription = prescription_extractor.extract_from_image(image_data)
                 prescription_dict = prescription.model_dump()
                 if CACHE_AVAILABLE and cache_manager:

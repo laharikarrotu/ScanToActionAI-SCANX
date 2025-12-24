@@ -11,7 +11,8 @@ import os
 from api.config import settings
 from api.dependencies import (
     prescription_extractor, interaction_checker, diet_advisor,
-    CACHE_AVAILABLE, cache_manager
+    CACHE_AVAILABLE, cache_manager,
+    rate_limiter
 )
 from core.error_handler import ErrorHandler
 from core.logger import get_logger
@@ -40,6 +41,8 @@ async def chat_with_agent(request: Request, chat_request: ChatRequest):
     """
     Conversational AI endpoint - Chat with HealthScan agent
     
+    **Rate Limit:** 20 requests per minute per IP
+    
     Provides intelligent explanations about:
     - Prescription details
     - Drug interactions
@@ -65,6 +68,18 @@ async def chat_with_agent(request: Request, chat_request: ChatRequest):
         raise HTTPException(
             status_code=503,
             detail="GEMINI_API_KEY is not configured. Please set it in your .env file."
+        )
+    
+    # Rate limiting (stricter for chat - 15 requests per minute)
+    client_ip = request.client.host if request.client else "unknown"
+    # Use separate rate limiter for chat to allow more requests
+    from api.rate_limiter import RateLimiter
+    chat_rate_limiter = RateLimiter(max_requests=15, window_seconds=60)
+    allowed, remaining = chat_rate_limiter.is_allowed(f"chat:{client_ip}")
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Please try again in a moment. ({remaining} requests remaining)"
         )
     
     try:

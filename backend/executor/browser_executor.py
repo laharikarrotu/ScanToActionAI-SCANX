@@ -6,6 +6,9 @@ from playwright.async_api import async_playwright, Browser, Page, BrowserContext
 from pydantic import BaseModel
 import asyncio
 import os
+import re
+import ipaddress
+from urllib.parse import urlparse
 
 class ActionStep(BaseModel):
     step: int
@@ -23,12 +26,87 @@ class ExecutionResult(BaseModel):
     logs: List[str] = []
 
 class BrowserExecutor:
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, allowed_domains: Optional[List[str]] = None):
         self.headless = headless
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self.playwright = None  # Store playwright instance
+        # Allowed domains for SSRF protection (None = allow all public domains, block private IPs)
+        self.allowed_domains = allowed_domains
+    
+    def _validate_url(self, url: str) -> bool:
+        """
+        Validate URL to prevent SSRF attacks.
+        
+        Blocks:
+        - Private IP ranges (127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        - Localhost variants
+        - Non-HTTP(S) protocols (file://, ftp://, etc.)
+        - Cloud metadata endpoints (169.254.169.254)
+        
+        Allows:
+        - Public HTTP/HTTPS URLs
+        - URLs matching allowed_domains whitelist (if set)
+        
+        Returns:
+            True if URL is safe, False otherwise
+        """
+        if not url or not url.strip():
+            return False
+        
+        try:
+            parsed = urlparse(url)
+            
+            # Only allow HTTP and HTTPS
+            if parsed.scheme not in ['http', 'https']:
+                return False
+            
+            # Extract hostname
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+            
+            # Block localhost variants
+            if hostname.lower() in ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']:
+                return False
+            
+            # Block cloud metadata endpoints
+            if hostname == '169.254.169.254' or hostname.startswith('metadata.'):
+                return False
+            
+            # Check if hostname is an IP address
+            try:
+                ip = ipaddress.ip_address(hostname)
+                
+                # Block private IP ranges
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    return False
+                
+                # Block multicast
+                if ip.is_multicast:
+                    return False
+                
+            except ValueError:
+                # Not an IP address, check domain whitelist if configured
+                if self.allowed_domains:
+                    # Check if hostname matches any allowed domain
+                    hostname_lower = hostname.lower()
+                    for allowed in self.allowed_domains:
+                        allowed_lower = allowed.lower().lstrip('http://').lstrip('https://').split('/')[0]
+                        if hostname_lower == allowed_lower or hostname_lower.endswith('.' + allowed_lower):
+                            return True
+                    # Not in whitelist
+                    return False
+                # No whitelist configured, allow public domains
+                pass
+            
+            return True
+            
+        except Exception as e:
+            import logging
+            logging.warning(f"URL validation error: {e}")
+            return False
     
     async def initialize(self):
         """Initialize browser session"""
@@ -169,6 +247,13 @@ class BrowserExecutor:
         try:
             # Navigate to start URL if provided
             if start_url:
+                # Validate URL to prevent SSRF attacks
+                if not self._validate_url(start_url):
+                    result.status = "error"
+                    result.error = "Invalid or unsafe URL"
+                    result.message = f"URL validation failed: {start_url}. Only public HTTP/HTTPS URLs are allowed."
+                    return result
+                
                 result.logs.append(f"Navigating to {start_url}")
                 await self.page.goto(start_url, wait_until="networkidle")
             
@@ -218,8 +303,14 @@ class BrowserExecutor:
                         successful_steps += 1
                     
                     elif step.action == "navigate":
-                        await self.page.goto(step.value or "", wait_until="networkidle", timeout=30000)
-                        result.logs.append(f"✓ Navigated to {step.value}")
+                        nav_url = step.value or ""
+                        # Validate URL to prevent SSRF attacks
+                        if not self._validate_url(nav_url):
+                            result.logs.append(f"✗ Invalid or unsafe URL: {nav_url}")
+                            continue
+                        
+                        await self.page.goto(nav_url, wait_until="networkidle", timeout=30000)
+                        result.logs.append(f"✓ Navigated to {nav_url}")
                         successful_steps += 1
                     
                     elif step.action == "wait":

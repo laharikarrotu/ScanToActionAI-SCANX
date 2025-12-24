@@ -57,6 +57,52 @@ class PrescriptionExtractor:
         self.client = None
         self.openai_model = None
     
+    def _validate_dosage(self, dosage: Optional[str], medication_name: str) -> tuple[bool, Optional[str]]:
+        """
+        Validate dosage for safety - check for suspicious values that might indicate OCR errors.
+        
+        Returns:
+            (is_valid, warning_message)
+        """
+        if not dosage:
+            return True, None  # Dosage is optional
+        
+        dosage_lower = dosage.lower().strip()
+        
+        # Check for suspicious patterns that might indicate misread numbers
+        # Common OCR errors: 5mg -> 50mg, 10mg -> 100mg, etc.
+        
+        # Extract numeric values from dosage
+        numbers = re.findall(r'\d+', dosage)
+        if not numbers:
+            return True, None  # No numbers found, can't validate
+        
+        # Check for extremely high values (likely OCR error)
+        for num_str in numbers:
+            try:
+                num = int(num_str)
+                # Flag suspiciously high dosages (e.g., > 1000mg for most medications)
+                # This is a heuristic - some medications do have high dosages
+                if num > 10000:  # Very high, likely error
+                    return False, f"WARNING: Dosage value {num} seems unusually high. Please verify the prescription image is clear and the dosage is correct."
+                if num > 1000 and 'mg' in dosage_lower:  # High but possible
+                    return True, f"CAUTION: Dosage {dosage} is high. Please verify this is correct."
+            except ValueError:
+                continue
+        
+        # Check for suspicious patterns (e.g., "50mg" when it should be "5mg")
+        # This is a heuristic - we can't be 100% sure, but we can flag potential issues
+        suspicious_patterns = [
+            (r'(\d)0+mg', 'Possible OCR error: extra zero in dosage'),
+            (r'(\d)00+mg', 'Possible OCR error: multiple extra zeros'),
+        ]
+        
+        for pattern, warning in suspicious_patterns:
+            if re.search(pattern, dosage_lower):
+                return True, f"CAUTION: {warning}. Please verify dosage {dosage} is correct."
+        
+        return True, None
+    
     def extract_from_image(self, image_data: bytes) -> PrescriptionInfo:
         """
         Extract medication information from prescription image
@@ -106,7 +152,20 @@ Be accurate - this information is critical for patient safety."""
             result_text = response.text
             result_dict = json.loads(result_text)
             
-            return PrescriptionInfo(**result_dict)
+            prescription = PrescriptionInfo(**result_dict)
+            
+            # Validate dosage for safety (life-critical)
+            if prescription.dosage:
+                is_valid, warning = self._validate_dosage(prescription.dosage, prescription.medication_name)
+                if not is_valid:
+                    raise ValueError(f"CRITICAL: {warning} This prescription cannot be processed automatically. Please verify the image and dosage manually.")
+                elif warning:
+                    # Log warning but allow processing
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Dosage validation warning for {prescription.medication_name}: {warning}")
+            
+            return prescription
             
         except json.JSONDecodeError as e:
             # JSON parsing failed - try to extract text response
