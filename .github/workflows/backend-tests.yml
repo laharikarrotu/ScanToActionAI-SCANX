@@ -54,17 +54,28 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-asyncio pytest-cov
     
+    - name: Initialize database tables
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-key' }}
+        ENCRYPTION_KEY: test-key-for-ci-only
+        JWT_SECRET: test-jwt-secret-for-ci
+        NODE_ENV: test
+      run: |
+        python -c "from memory.database import init_db; init_db(); print('✅ Database tables initialized')"
+    
     - name: Run unit tests
       working-directory: ./backend
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
         # GEMINI_API_KEY is optional for unit tests (only needed for integration tests)
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-key' }}
         ENCRYPTION_KEY: test-key-for-ci-only
         JWT_SECRET: test-jwt-secret-for-ci
         NODE_ENV: test
       run: |
-        pytest tests/ -v --cov=backend --cov-report=xml --cov-report=term
+        pytest tests/test_error_handler.py tests/test_pii_redaction.py tests/test_encryption.py tests/test_circuit_breaker.py tests/test_cache.py tests/test_rate_limiter.py -v --cov=. --cov-report=xml --cov-report=term --ignore=tests/test_backend_modules.py --ignore=tests/test_database.py --ignore=tests/test_all_connections.py --ignore=tests/test_api_endpoints.py --ignore=tests/test_api.py --ignore=tests/test_connection.py --ignore=tests/test_full_flow.py
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

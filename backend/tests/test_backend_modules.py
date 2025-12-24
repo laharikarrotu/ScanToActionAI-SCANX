@@ -5,8 +5,9 @@ Test backend module imports and configuration
 from api.config import settings
 
 print('🔍 Testing Backend Configuration...')
-openai_set = 'SET' if settings.openai_api_key and settings.openai_api_key != 'your_key_here' else 'NOT SET'
-print(f'✅ OpenAI API Key: {openai_set}')
+# OpenAI removed - using Gemini only
+gemini_set = 'SET' if hasattr(settings, 'gemini_api_key') and settings.gemini_api_key else 'NOT SET'
+print(f'✅ Gemini API Key: {gemini_set}')
 print(f'✅ Database URL: {"SET" if settings.database_url else "NOT SET"}')
 print(f'✅ Frontend URL: {settings.frontend_url}')
 print(f'✅ JWT Secret: {"SET" if settings.jwt_secret else "NOT SET"}')

@@ -2,7 +2,7 @@
 """
 Test database connection and operations
 """
-from memory.database import engine, SessionLocal, ScanRequest, UISchema, ActionPlan, ExecutionResult
+from memory.database import engine, SessionLocal, ScanRequest, UISchema, ActionPlan, ExecutionResult, init_db
 from sqlalchemy import inspect
 
 print('🔍 Testing Database Connection...')
@@ -11,16 +11,29 @@ try:
     with engine.connect() as conn:
         print('✅ Database connection successful')
     
-    # Check tables exist
+    # Initialize tables if they don't exist
     inspector = inspect(engine)
     tables = inspector.get_table_names()
-    table_list = ', '.join(tables)
-    print(f'✅ Found {len(tables)} tables: {table_list}')
+    
+    required_tables = ['scan_requests', 'ui_schemas', 'action_plans', 'execution_results']
+    missing_tables = [t for t in required_tables if t not in tables]
+    
+    if missing_tables:
+        print(f'⚠️  Missing tables: {missing_tables}')
+        print('📦 Creating database tables...')
+        init_db()
+        # Re-check tables
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        print(f'✅ Found {len(tables)} tables after initialization')
+    else:
+        table_list = ', '.join(tables)
+        print(f'✅ Found {len(tables)} tables: {table_list}')
     
     # Test insert/query
     db = SessionLocal()
     try:
-        # Count existing records
+        # Count existing records (should work now that tables exist)
         scan_count = db.query(ScanRequest).count()
         print(f'✅ Can query scan_requests: {scan_count} records')
         
