@@ -353,18 +353,29 @@ Your AI-powered healthcare assistant. Get started by choosing an action below.`,
       // Handle text questions
       if (userMessage) {
         // Send to conversational endpoint
-        const chatResponse = await fetch(`${API_BASE_URL}/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: userMessage,
-            context: {
-              prescription_data: prescriptionData,
-              interaction_result: interactionResult,
-              diet_data: dietData,
-            },
-          }),
-        });
+        let chatResponse: Response;
+        try {
+          chatResponse = await fetch(`${API_BASE_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: userMessage,
+              context: {
+                prescription_data: prescriptionData,
+                interaction_result: interactionResult,
+                diet_data: dietData,
+              },
+            }),
+          });
+        } catch (fetchError) {
+          // Network error - backend not reachable
+          const isLocalhost = API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1');
+          if (isLocalhost) {
+            throw new Error(`Cannot connect to backend server at ${API_BASE_URL}. Make sure the backend is running: cd backend && uvicorn api.main:app --reload`);
+          } else {
+            throw new Error(`Cannot connect to backend server at ${API_BASE_URL}. The server may be down or unreachable.`);
+          }
+        }
 
         if (!chatResponse.ok) {
           let errorMessage = 'Failed to get a response from the AI';
@@ -399,7 +410,13 @@ Your AI-powered healthcare assistant. Get started by choosing an action below.`,
       // Also add error message to chat for context
       let userFriendlyMessage = '❌ **I encountered an error processing your request.**\n\n';
       
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network')) {
+      if (errorMessage.includes('Cannot connect to backend') || errorMessage.includes('backend server')) {
+        userFriendlyMessage += `**Connection Error:** ${errorMessage}\n\n`;
+        userFriendlyMessage += '**To fix this:**\n';
+        userFriendlyMessage += '1. Make sure the backend server is running\n';
+        userFriendlyMessage += '2. Check that the API URL is correct\n';
+        userFriendlyMessage += '3. Verify your network connection';
+      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network')) {
         userFriendlyMessage += '**Network Error:** Please check your internet connection and try again.\n\n';
         userFriendlyMessage += 'If the problem persists, this may be a temporary server issue. Please try again in a few moments.';
       } else if (errorMessage.includes('timeout')) {
