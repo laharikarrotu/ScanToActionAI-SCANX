@@ -69,9 +69,11 @@ class TestImageEncryption:
         assert encrypted["medication_name"] != prescription["medication_name"]
         assert encrypted["patient_name"] != prescription["patient_name"]
         assert encrypted["prescriber"] != prescription["prescriber"]
+        # Date is also in sensitive_fields list, so it should be encrypted
+        assert encrypted["date"] != prescription["date"]
         
-        # Non-sensitive fields should remain the same
-        assert encrypted["date"] == prescription["date"]
+        # Check that encryption flags are set
+        assert encrypted.get("medication_name_encrypted") == True
     
     def test_decrypt_prescription_data(self):
         """Test prescription data decryption"""
@@ -96,13 +98,16 @@ class TestImageEncryption:
     
     def test_wrong_key_fails(self):
         """Test that decryption with wrong key fails"""
+        # Note: Using different string keys will generate different salts,
+        # so they will definitely fail. But even with same key string, 
+        # different instances have different salts, so this test is valid.
         encryption1 = ImageEncryption(encryption_key="key1", require_encryption=False)
         encryption2 = ImageEncryption(encryption_key="key2", require_encryption=False)
         
         original_data = b"test data"
         encrypted = encryption1.encrypt_image(original_data)
         
-        # Decryption with wrong key should fail
+        # Decryption with wrong key should fail (different key = different salt = different derived key)
         with pytest.raises(Exception):
             encryption2.decrypt_image(encrypted)
 
