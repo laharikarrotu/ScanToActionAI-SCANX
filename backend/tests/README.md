@@ -1,4 +1,6 @@
-# Test Suite Overview
+# Backend Test Suite
+
+> **Note**: For comprehensive testing documentation, see [`docs/tests/README.md`](../../docs/tests/README.md)
 
 ## Philosophy: Fail Fast, Not Skip
 
@@ -67,5 +69,6 @@ pip install -r requirements.txt
 
 ## Documentation
 
-See `docs/tests/TEST_DOCUMENTATION.md` for detailed documentation of each test function.
+- **Comprehensive Testing Guide**: [`docs/tests/README.md`](../../docs/tests/README.md)
+- **Detailed Test Documentation**: [`docs/tests/TEST_DOCUMENTATION.md`](../../docs/tests/TEST_DOCUMENTATION.md)
 
