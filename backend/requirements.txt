@@ -13,7 +13,6 @@ python-dotenv==1.0.0
 sqlalchemy==2.0.25
 pillow==10.2.0
 python-jose[cryptography]
-httpx==3.3.0
 psycopg2-binary==2.9.9
 opencv-python>=4.9.0
 pytesseract==0.3.10
