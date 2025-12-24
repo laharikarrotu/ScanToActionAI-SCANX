@@ -240,8 +240,11 @@ class ErrorHandler:
             error_str = re.sub(r'[a-zA-Z]:\\[^\s]+|/[^\s]+\.(py|js|ts|json|env)', '[file]', error_str)
             # Remove potential connection strings
             error_str = re.sub(r'(postgresql|mysql|mongodb)://[^\s]+', '[database]', error_str, flags=re.IGNORECASE)
-            # Remove API keys (common patterns)
-            error_str = re.sub(r'(api[_-]?key|secret|token|password)\s*[:=]\s*[\w-]+', r'\1=[REDACTED]', error_str, flags=re.IGNORECASE)
+            # Remove API keys (common patterns like sk-xxx, xxxx-xxxx, etc.)
+            # Match API key patterns: sk-xxx, xxxx-xxxx-xxxx, or any alphanumeric with dashes/underscores
+            error_str = re.sub(r'(api[_-]?key|secret|token|password)\s*[:=]\s*[a-zA-Z0-9_-]+', r'\1=[REDACTED]', error_str, flags=re.IGNORECASE)
+            # Also match standalone API key patterns (sk-xxx, xxxx-xxxx)
+            error_str = re.sub(r'\b(sk-[a-zA-Z0-9_-]+|[a-zA-Z0-9]{20,})\b', '[REDACTED]', error_str)
             # Remove email addresses
             error_str = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[email]', error_str)
             # Remove IP addresses
