@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "tesseract", "pip"]
+nixPkgs = ["python311", "tesseract"]
 
 [phases.install]
 cmds = [
