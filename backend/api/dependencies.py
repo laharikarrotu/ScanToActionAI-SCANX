@@ -9,6 +9,10 @@ from typing import Optional
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env file to ensure ENCRYPTION_KEY is available
+from dotenv import load_dotenv
+load_dotenv()
+
 from api.config import settings
 from core.logger import get_logger
 from vision.ui_detector import VisionEngine, UISchema
@@ -27,6 +31,7 @@ from nutrition.diet_advisor import DietAdvisor
 from nutrition.condition_advisor import ConditionAdvisor
 from nutrition.food_scanner import FoodScanner
 from api.rate_limiter import RateLimiter
+from core.rate_limiting import get_rate_limiter, InMemoryRateLimiter
 
 logger = get_logger("api.dependencies")
 
@@ -143,15 +148,15 @@ logger.info("Food Scanner using Gemini Pro 1.5")
 
 # Rate limiter selection (priority: Redis > Database > Token Bucket > In-Memory)
 # Use factory function to get best available rate limiter
-rate_limiter: Optional[object] = get_rate_limiter(preferred="redis")
+rate_limiter: Optional[object] = None
 
-# Fallback to simple in-memory if factory returns None
-if rate_limiter is None:
-    rate_limiter = InMemoryRateLimiter()
+try:
+    rate_limiter = get_rate_limiter(preferred="redis")
+    if rate_limiter:
         logger.info("Using Redis rate limiter")
-    except Exception as e:
-        logger.warning(f"Redis rate limiter failed: {e}, trying database...", exception=e)
-        rate_limiter = None
+except Exception as e:
+    logger.warning(f"Redis rate limiter failed: {e}, trying database...", exception=e)
+    rate_limiter = None
 
 if not rate_limiter and DATABASE_RATE_LIMITER_AVAILABLE and DatabaseRateLimiter and settings.database_url:
     try:

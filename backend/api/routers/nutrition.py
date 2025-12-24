@@ -1,7 +1,7 @@
 """
 Nutrition and diet recommendation endpoints
 """
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
 import re
