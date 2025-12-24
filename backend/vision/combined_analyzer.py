@@ -54,7 +54,8 @@ class CombinedAnalyzer:
         # Preprocess image
         try:
             processed_image = self.ocr_preprocessor.preprocess_image(image_data)
-        except:
+        except (ValueError, IOError, OSError, AttributeError):
+            # Fallback to original if preprocessing fails
             processed_image = image_data
         
         # Extract OCR text

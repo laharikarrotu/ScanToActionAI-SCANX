@@ -21,8 +21,10 @@ import time
 from unittest.mock import Mock, patch
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
 from core.cache import CacheManager
 
 
@@ -83,7 +85,10 @@ class TestCacheManager:
         cache.set_prescription(image_hash, prescription, ttl=3600)
         cached = cache.get_prescription(image_hash)
         
-        assert cached == prescription
+        # Verify exact values returned
+        assert cached == prescription, f"Expected {prescription}, got {cached}"
+        assert cached["medication_name"] == "Aspirin", "Medication name should match exactly"
+        assert cached["dosage"] == "100mg", "Dosage should match exactly"
     
     def test_interaction_cache(self):
         """Test interaction caching"""

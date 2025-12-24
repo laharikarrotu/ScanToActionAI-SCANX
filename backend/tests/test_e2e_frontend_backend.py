@@ -25,12 +25,24 @@ Test Structure:
 import pytest
 import sys
 import os
-import httpx
+
+# Optional dependencies - skip tests if not available
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 import asyncio
 from typing import Dict, Any, Optional
 import json
 from io import BytesIO
-from PIL import Image
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -83,6 +95,11 @@ class TestE2EPrescriptionFlow:
           * prescriber (if available)
         - Data format matches TypeScript types in frontend
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        if not PIL_AVAILABLE:
+            pytest.skip("PIL/Pillow not available")
         # Simulate frontend file upload
         img = Image.new('RGB', (200, 200), color='white')
         img_bytes = BytesIO()
@@ -230,6 +247,12 @@ class TestE2EInteractionFlow:
           * warnings: User-friendly warnings
         - Data format matches frontend InteractionResult type
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        if not PIL_AVAILABLE:
+            pytest.skip("PIL/Pillow not available")
+        
         # Create multiple test images
         img1 = Image.new('RGB', (200, 200), color='white')
         img2 = Image.new('RGB', (200, 200), color='white')
@@ -291,6 +314,10 @@ class TestE2EInteractionFlow:
         - Recommendations consider medications from interactions
         - Response format is correct
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         # This would test:
         # 1. Check interactions → get medications
         # 2. Use medications → get diet recommendations
@@ -338,6 +365,10 @@ class TestE2EDietFlow:
           * warnings: Medication-food interaction warnings
         - Data format matches frontend DietData type
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         async with httpx.AsyncClient(timeout=60.0) as client:
             # Simulate frontend form submission
             data = {
@@ -397,6 +428,10 @@ class TestE2EFrontendBackendContract:
         - Optional fields are handled correctly
         - No unexpected fields (or they're ignored)
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         # This would validate:
         # 1. Get actual API response
         # 2. Compare against TypeScript type definition
@@ -426,6 +461,9 @@ class TestE2EFrontendBackendContract:
         - Error codes are appropriate
         - Frontend can extract error details
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         async with httpx.AsyncClient(timeout=TEST_TIMEOUT) as client:
             # Test various error scenarios
             error_scenarios = [
@@ -500,6 +538,10 @@ class TestE2EUserScenarios:
         - Data flows correctly between steps
         - User experience is smooth
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         # Implement complete user flow
         pass
     
@@ -530,6 +572,10 @@ class TestE2EUserScenarios:
         - New data is integrated
         - Interactions consider all prescriptions
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         pass
     
     @pytest.mark.e2e
@@ -559,5 +605,9 @@ class TestE2EUserScenarios:
         - User can retry
         - System recovers cleanly
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        
         pass
 

@@ -20,13 +20,25 @@ Each test function is documented with:
 import pytest
 import sys
 import os
-import httpx
+
+# Optional dependencies - skip tests if not available
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 import asyncio
 from typing import Dict, Any, Optional
 import json
 import base64
 from io import BytesIO
-from PIL import Image
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -96,6 +108,11 @@ class TestPrescriptionAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_extract_prescription_rate_limiting(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        if not PIL_AVAILABLE:
+            pytest.skip("PIL/Pillow not available")
         """
         Purpose: Verifies that rate limiting works on prescription extraction endpoint.
         
@@ -144,6 +161,9 @@ class TestPrescriptionAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_extract_prescription_file_validation(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         """
         Purpose: Verifies that file upload validation works (size, type, etc.).
         
@@ -197,6 +217,11 @@ class TestMedicationAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_check_interactions_multiple_prescriptions(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        if not PIL_AVAILABLE:
+            pytest.skip("PIL/Pillow not available")
         """
         Purpose: Verifies that multi-prescription interaction checking works.
         
@@ -264,6 +289,9 @@ class TestChatAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_chat_basic_message(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         """
         Purpose: Verifies that basic chat functionality works.
         
@@ -304,6 +332,9 @@ class TestChatAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_chat_with_context(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         """
         Purpose: Verifies that chat works with prescription context.
         
@@ -354,6 +385,9 @@ class TestNutritionAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_get_diet_recommendations(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         """
         Purpose: Verifies that diet recommendations are generated correctly.
         
@@ -407,6 +441,11 @@ class TestVisionAPI:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_analyze_and_execute_verify_only(self):
+        """Skip if dependencies not available"""
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
+        if not PIL_AVAILABLE:
+            pytest.skip("PIL/Pillow not available")
         """
         Purpose: Verifies that vision analysis works in verify-only mode (HITL).
         
@@ -533,6 +572,9 @@ class TestErrorHandling:
         - No sensitive data in error responses
         - Error messages are helpful but generic
         """
+        # Skip if dependencies not available
+        if not HTTPX_AVAILABLE:
+            pytest.skip("httpx not available")
         async with httpx.AsyncClient(timeout=TEST_TIMEOUT) as client:
             # Trigger an error (e.g., invalid request)
             response = await client.post(

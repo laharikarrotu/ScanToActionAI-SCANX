@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Quick connection test"""
+import sys
 import os
+
+# Add backend to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from dotenv import load_dotenv
 import psycopg2
 

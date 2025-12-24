@@ -18,8 +18,10 @@ import sys
 import os
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
 from core.encryption import ImageEncryption
 
 
@@ -160,15 +162,31 @@ class TestImageEncryption:
         
         encrypted = encryption.encrypt_prescription_data(prescription)
         
-        # Sensitive fields should be encrypted (different from original)
+        # Verify actual encrypted values (base64 encoded strings, not original)
         assert encrypted["medication_name"] != prescription["medication_name"]
         assert encrypted["patient_name"] != prescription["patient_name"]
         assert encrypted["prescriber"] != prescription["prescriber"]
-        # Date is also in sensitive_fields list, so it should be encrypted
         assert encrypted["date"] != prescription["date"]
         
-        # Check that encryption flags are set
+        # Verify encrypted fields are base64 strings (actual format)
+        import base64
+        for field in ["medication_name", "patient_name", "prescriber", "date"]:
+            encrypted_value = encrypted[field]
+            assert isinstance(encrypted_value, str), f"{field} should be encrypted string, got {type(encrypted_value)}"
+            # Verify it's valid base64 (actual encrypted format)
+            try:
+                base64.b64decode(encrypted_value)
+            except Exception as e:
+                pytest.fail(f"{field} encrypted value is not valid base64: {e}")
+        
+        # Verify actual encryption flags are set (real boolean values)
         assert encrypted.get("medication_name_encrypted") == True
+        assert encrypted.get("patient_name_encrypted") == True
+        assert encrypted.get("prescriber_encrypted") == True
+        assert encrypted.get("date_encrypted") == True
+        
+        # Verify non-sensitive field is unchanged (actual value check)
+        assert encrypted["dosage"] == prescription["dosage"], "Dosage should not be encrypted"
     
     def test_decrypt_prescription_data(self):
         """

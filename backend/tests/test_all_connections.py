@@ -11,7 +11,7 @@ import json
 from typing import Dict, List, Tuple
 
 # Add backend directory to path
-backend_dir = os.path.join(os.path.dirname(__file__), 'backend')
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
 # Test results storage
@@ -32,7 +32,7 @@ def test_backend_imports():
         "api.main",
         "api.config",
         "api.auth",
-        "api.rate_limiter",
+        "core.rate_limiting",
         "vision.ui_detector",
         "vision.gemini_detector",
         "vision.image_quality",

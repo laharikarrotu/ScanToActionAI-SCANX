@@ -17,9 +17,6 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react'], // Tree-shake icon library
   },
   
-  // Compiler optimizations
-  swcMinify: true,
-  
   // Output optimization
   output: 'standalone', // Optimize for production deployment
 

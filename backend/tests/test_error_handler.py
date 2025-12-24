@@ -18,8 +18,10 @@ import sys
 import os
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
 from core.error_handler import ErrorHandler, ErrorCategory
 
 
@@ -68,10 +70,12 @@ class TestErrorHandler:
         error = Exception("Error in /path/to/file.py: Database connection postgresql://user:pass@host/db failed")
         sanitized = ErrorHandler.sanitize_error_message(error, is_production=True)
         
-        # Should remove file paths and connection strings
+        # Verify actual replacement values, not just removal
         assert "/path/to/file.py" not in sanitized
         assert "postgresql://" not in sanitized
-        assert len(sanitized) > 0  # Should still have some message
+        assert "[file]" in sanitized, f"Expected [file] placeholder, got: {sanitized}"
+        assert "[database]" in sanitized, f"Expected [database] placeholder, got: {sanitized}"
+        assert len(sanitized) > 0
     
     def test_sanitize_error_message_removes_api_key(self):
         """
@@ -85,10 +89,10 @@ class TestErrorHandler:
         error = Exception("API key: sk-1234567890abcdef failed")
         sanitized = ErrorHandler.sanitize_error_message(error, is_production=True)
         
-        # Should remove or redact the API key
+        # Verify actual replacement - API key should be replaced with [REDACTED]
         assert "sk-1234567890abcdef" not in sanitized
-        # The method uses regex to replace, so check that key pattern is gone
-        assert "key" in sanitized.lower() or len(sanitized) > 0
+        assert "[REDACTED]" in sanitized, f"Expected [REDACTED] in sanitized message, got: {sanitized}"
+        assert "api key" in sanitized.lower() or "key" in sanitized.lower()
     
     def test_sanitize_error_message_removes_email(self):
         """
@@ -102,9 +106,10 @@ class TestErrorHandler:
         error = Exception("User email test@example.com not found")
         sanitized = ErrorHandler.sanitize_error_message(error, is_production=True)
         
-        # Should remove email address
+        # Verify actual replacement - email should be replaced with [email]
         assert "test@example.com" not in sanitized
-        assert len(sanitized) > 0  # Should still have some message
+        assert "[email]" in sanitized, f"Expected [email] placeholder, got: {sanitized}"
+        assert len(sanitized) > 0
     
     def test_sanitize_error_message_removes_ip(self):
         """
@@ -118,9 +123,10 @@ class TestErrorHandler:
         error = Exception("Connection to 192.168.1.1 failed")
         sanitized = ErrorHandler.sanitize_error_message(error, is_production=True)
         
-        # Should remove IP address
+        # Verify actual replacement - IP should be replaced with [ip]
         assert "192.168.1.1" not in sanitized
-        assert len(sanitized) > 0  # Should still have some message
+        assert "[ip]" in sanitized, f"Expected [ip] placeholder, got: {sanitized}"
+        assert len(sanitized) > 0
     
     def test_get_user_friendly_error_production(self):
         """Test user-friendly error messages in production"""
@@ -136,8 +142,9 @@ class TestErrorHandler:
             error = ConnectionError("Connection timeout to database")
             message = ErrorHandler.get_user_friendly_error(error)
         
-        # Should return a generic user-friendly message
-        assert "connection" in message.lower() or "error" in message.lower()
+        # Verify actual exact message returned (not just generic check)
+        expected_message = "Connection error. Please check your internet connection and try again."
+        assert message == expected_message, f"Expected exact message '{expected_message}', got '{message}'"
         assert len(message) > 0
     
     def test_get_user_friendly_error_development(self):

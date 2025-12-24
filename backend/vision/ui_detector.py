@@ -210,8 +210,9 @@ Extract every visible piece of information."""
         # Step 1: Preprocess image for better quality
         try:
             processed_image = self.ocr_preprocessor.preprocess_image(image_data)
-        except:
-            processed_image = image_data  # Use original if preprocessing fails
+        except (ValueError, IOError, OSError, AttributeError):
+            # Use original if preprocessing fails
+            processed_image = image_data
         
         # Step 2: Extract text using OCR
         ocr_result = self.ocr_preprocessor.extract_text(processed_image, preprocess=False)
@@ -372,7 +373,8 @@ If you cannot see the image clearly, use the OCR text to create elements:
                             url_hint=result_dict.get("url_hint"),
                             elements=elements
                         )
-            except:
+            except (json.JSONDecodeError, ValueError, KeyError):
+                # Fallback parsing failed, continue to final fallback
                 pass
             
         except Exception as e:

@@ -69,7 +69,7 @@ class ImageEncryption:
                     # Try to use as-is if it's already a valid Fernet key
                     Fernet(self.encryption_key.encode())
                     self.encryption_key = self.encryption_key.encode()
-                except:
+                except (ValueError, TypeError):
                     # Derive key from password using PBKDF2
                     # Security: Generate random salt per encryption instance
                     # In production, should use random salt per user/record and store with encrypted data

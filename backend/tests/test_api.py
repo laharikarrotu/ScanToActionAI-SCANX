@@ -2,6 +2,12 @@
 Simple API test script
 Run this to verify the backend is working
 """
+import sys
+import os
+
+# Add backend to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import requests
 import json
 

@@ -179,7 +179,8 @@ Be accurate - this information is critical for patient safety."""
                         medication_name=med_match.group(1).strip(),
                         instructions=result_text[:500]  # First 500 chars
                     )
-            except:
+            except (AttributeError, IndexError, ValueError):
+                # Regex match failed, continue to raise error
                 pass
             # If extraction fails, raise the error
             raise ValueError(f"Failed to parse prescription data. The AI response was not in the expected format. Please try again with a clearer image.")

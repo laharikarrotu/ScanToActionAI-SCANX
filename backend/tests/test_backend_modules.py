@@ -2,6 +2,12 @@
 """
 Test backend module imports and configuration
 """
+import sys
+import os
+
+# Add backend to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from api.config import settings
 
 print('🔍 Testing Backend Configuration...')

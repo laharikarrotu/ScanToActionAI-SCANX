@@ -113,7 +113,7 @@ class AuditLogger:
             try:
                 with open(self.log_file, "r") as f:
                     entries = json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 entries = []
         
         entries.append(entry)
@@ -207,7 +207,7 @@ class AuditLogger:
         try:
             with open(self.log_file, "r") as f:
                 entries = json.load(f)
-        except:
+        except (FileNotFoundError, json.JSONDecodeError, IOError):
             return []
         
         # Filter entries

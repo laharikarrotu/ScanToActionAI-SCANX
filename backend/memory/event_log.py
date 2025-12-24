@@ -31,7 +31,7 @@ class EventLogger:
             try:
                 with open(self.log_file, "r") as f:
                     events = json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 events = []
         
         # Append new event

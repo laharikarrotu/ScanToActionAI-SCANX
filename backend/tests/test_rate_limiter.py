@@ -19,9 +19,11 @@ import os
 import time
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
-from api.rate_limiter import RateLimiter
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
+from core.rate_limiting import InMemoryRateLimiter
 
 
 class TestRateLimiter:
@@ -29,29 +31,33 @@ class TestRateLimiter:
     
     def test_rate_limiter_allows_requests(self):
         """Test that rate limiter allows requests within limit"""
-        limiter = RateLimiter(max_requests=5, window_seconds=60)
+        limiter = InMemoryRateLimiter(max_requests=5, window_seconds=60)
         
+        # Verify actual remaining count decreases with each request
         for i in range(5):
             allowed, remaining = limiter.is_allowed("test_user")
-            assert allowed == True
-            assert remaining >= 0
+            assert allowed == True, f"Request {i+1} should be allowed"
+            expected_remaining = 5 - (i + 1)
+            assert remaining == expected_remaining, f"Expected remaining={expected_remaining}, got {remaining}"
     
     def test_rate_limiter_blocks_excess_requests(self):
         """Test that rate limiter blocks requests over limit"""
-        limiter = RateLimiter(max_requests=3, window_seconds=60)
+        limiter = InMemoryRateLimiter(max_requests=3, window_seconds=60)
         
-        # Use up all requests
-        for _ in range(3):
-            limiter.is_allowed("test_user")
+        # Use up all requests and verify actual counts
+        for i in range(3):
+            allowed, remaining = limiter.is_allowed("test_user")
+            assert allowed == True, f"Request {i+1} should be allowed"
+            assert remaining == (3 - (i + 1)), f"Expected remaining={3 - (i + 1)}, got {remaining}"
         
-        # Next request should be blocked
+        # Next request should be blocked with exact values
         allowed, remaining = limiter.is_allowed("test_user")
-        assert allowed == False
-        assert remaining == 0
+        assert allowed == False, "Request over limit should be blocked"
+        assert remaining == 0, f"Expected remaining=0 when blocked, got {remaining}"
     
     def test_rate_limiter_reset(self):
         """Test that rate limiter reset works"""
-        limiter = RateLimiter(max_requests=2, window_seconds=60)
+        limiter = InMemoryRateLimiter(max_requests=2, window_seconds=60)
         
         # Use up requests
         limiter.is_allowed("test_user")
@@ -70,7 +76,7 @@ class TestRateLimiter:
     
     def test_rate_limiter_per_user(self):
         """Test that rate limiter works per user"""
-        limiter = RateLimiter(max_requests=2, window_seconds=60)
+        limiter = InMemoryRateLimiter(max_requests=2, window_seconds=60)
         
         # User 1 uses up requests
         limiter.is_allowed("user1")

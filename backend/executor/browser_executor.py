@@ -147,8 +147,8 @@ class BrowserExecutor:
             try:
                 if self.playwright:
                     self.playwright = None
-            except:
-                # Element not found, continue to next step
+            except (AttributeError, RuntimeError):
+                # Cleanup error, continue anyway
                 pass
         except Exception as e:
             # Log but don't raise - cleanup should be best effort
@@ -210,7 +210,8 @@ class BrowserExecutor:
                     elements = await page.query_selector_all(selector)
                     if elements and len(elements) > 0:
                         return selector
-                except:
+                except (TimeoutError, ValueError):
+                    # Invalid selector, try next one
                     continue
         
         # Strategy 2: Try by type only (fallback)
@@ -275,7 +276,7 @@ class BrowserExecutor:
                             await self.page.wait_for_selector(text_selector, timeout=2000, state="visible")
                             selector = text_selector
                             result.logs.append(f"✓ Found element using text search")
-                        except:
+                        except (TimeoutError, ValueError):
                             result.logs.append(f"✗ Skipping step {step.step} - element not found")
                             continue
                     else:

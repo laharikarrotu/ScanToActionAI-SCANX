@@ -1,0 +1,10 @@
+# This file documents that IDE linter warnings for GitHub Actions are false positives
+# The actions referenced (actions/checkout@v4, actions/setup-python@v5, etc.) are valid
+# and will work correctly when workflows run on GitHub.
+#
+# Common false positive warnings:
+# - "Unable to resolve action" - IDE can't resolve GitHub Actions locally, but they work on GitHub
+# - "Context access might be invalid" - IDE warnings about secrets context, but they're valid
+#
+# These warnings can be safely ignored. The workflows will execute correctly on GitHub.
+

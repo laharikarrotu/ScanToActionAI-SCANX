@@ -44,7 +44,8 @@ class GeminiVisionEngine:
         # Preprocess image
         try:
             processed_image = self.ocr_preprocessor.preprocess_image(image_data)
-        except:
+        except (ValueError, IOError, OSError, AttributeError):
+            # Fallback to original if preprocessing fails
             processed_image = image_data
         
         # Extract OCR text
@@ -160,7 +161,7 @@ Return ONLY one word: prescription, medical_form, insurance_card, appointment_pa
             if doc_type in valid_types:
                 return doc_type
             return "other"
-        except:
+        except (ValueError, AttributeError, KeyError):
             return "other"
     
     def _build_prompt(self, doc_type: str, ocr_text: str, hint: Optional[str]) -> str:

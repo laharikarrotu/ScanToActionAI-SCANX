@@ -10,7 +10,11 @@ from .error_handler import ErrorHandler, handle_errors
 from .resource_manager import ResourceManager, setup_graceful_shutdown
 from .encryption import ImageEncryption
 from .audit_logger import AuditLogger, AuditAction
-from .streaming import StreamingResponseBuilder
+# Lazy import to avoid FastAPI dependency for unit tests
+try:
+    from .streaming import StreamingResponseBuilder
+except ImportError:
+    StreamingResponseBuilder = None  # Allow tests to import other modules
 from .logger import StructuredLogger, get_logger, LogLevel
 from .middleware import RequestLoggingMiddleware, PerformanceMiddleware
 from .pii_redaction import PIIRedactor

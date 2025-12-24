@@ -20,8 +20,10 @@ import os
 from datetime import datetime
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
 from core.circuit_breaker import CircuitBreaker, CircuitState
 
 

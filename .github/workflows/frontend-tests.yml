@@ -1,6 +1,9 @@
 # GitHub Actions workflow for frontend tests
-# Note: IDE linter warnings about "Unable to resolve action" are false positives.
-# These actions are valid and will work correctly when the workflow runs on GitHub.
+#
+# NOTE: IDE linter warnings are FALSE POSITIVES and can be safely ignored:
+# - "Unable to resolve action" warnings: IDE can't resolve GitHub Actions locally, but they work on GitHub
+# These workflows will execute correctly on GitHub despite IDE warnings.
+#
 name: Frontend Tests
 
 on:
@@ -39,7 +42,7 @@ jobs:
     
     - name: Run ESLint
       working-directory: ./app/frontend
-      run: npm run lint || true  # Don't fail on lint errors for now
+      run: npm run lint -- --max-warnings=0 || echo "⚠️ Linting issues found (non-blocking)"
     
     - name: Build application
       working-directory: ./app/frontend

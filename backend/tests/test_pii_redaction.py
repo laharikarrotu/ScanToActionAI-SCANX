@@ -18,8 +18,10 @@ import sys
 import os
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
+# Import directly from module to avoid FastAPI dependency chain in core/__init__.py
 from core.pii_redaction import PIIRedactor
 
 
@@ -155,9 +157,15 @@ class TestPIIRedactor:
         detected = redactor.detect_pii_in_text(text)
         redacted, count = redactor.redact_text(text, detected)
         
-        assert count > 0, "Should redact PII"
+        # Verify actual redaction format and count
+        assert count > 0, f"Should redact PII, but count is {count}"
         assert "123-45-6789" not in redacted
         assert "john@example.com" not in redacted
+        # Verify actual redaction markers with specific types
+        assert "[REDACTED_SSN]" in redacted, f"Expected [REDACTED_SSN] in redacted text, got: {redacted}"
+        assert "[REDACTED_EMAIL]" in redacted, f"Expected [REDACTED_EMAIL] in redacted text, got: {redacted}"
+        # Verify count matches actual redactions
+        assert count >= 2, f"Expected at least 2 redactions (SSN and Email), got {count}"
     
     def test_no_false_positives_medical_terms(self):
         """Test that medical terms are not detected as names"""

@@ -18,7 +18,7 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 # Add backend to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from executor.browser_executor import BrowserExecutor
 from vision.ui_detector import VisionEngine

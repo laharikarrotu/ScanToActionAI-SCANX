@@ -2,6 +2,12 @@
 """
 Test database connection and operations
 """
+import sys
+import os
+
+# Add backend to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from memory.database import engine, SessionLocal, ScanRequest, UISchema, ActionPlan, ExecutionResult, init_db
 from sqlalchemy import inspect
 

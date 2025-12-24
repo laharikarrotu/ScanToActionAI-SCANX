@@ -2,6 +2,12 @@
 """
 Test all API endpoints
 """
+import sys
+import os
+
+# Add backend to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import requests
 import json
 import time

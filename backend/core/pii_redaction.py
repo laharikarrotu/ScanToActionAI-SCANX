@@ -354,8 +354,8 @@ class PIIRedactor:
             try:
                 format_name = image.format or 'PNG'
                 image.save(output, format=format_name)
-            except:
-                # Fallback to PNG
+            except (ValueError, IOError, OSError):
+                # Fallback to PNG if format save fails
                 image.save(output, format='PNG')
             
             redacted_data = output.getvalue()
