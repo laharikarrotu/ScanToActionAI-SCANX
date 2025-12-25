@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "tesseract", "libGL", "libGLU"]
+nixPkgs = ["python311", "python311Packages.pip", "tesseract", "mesa"]
 
 [phases.install]
 cmds = [
