@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "tesseract", "mesa"]
+nixPkgs = ["python311", "python311Packages.pip", "tesseract"]
 
 [phases.install]
 cmds = [
@@ -10,5 +10,5 @@ cmds = [
 ]
 
 [start]
-cmd = "export LD_LIBRARY_PATH=$HOME/.nix-profile/lib:/nix/var/nix/profiles/default/lib:$LD_LIBRARY_PATH && /opt/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port $PORT"
+cmd = "/opt/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port $PORT"
 
