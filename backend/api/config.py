@@ -47,7 +47,13 @@ settings = Settings()
 DEFAULT_JWT_SECRET = "change-me-in-production"
 if settings.jwt_secret == DEFAULT_JWT_SECRET:
     # In production, fail immediately
-    if os.getenv("NODE_ENV") == "production" or os.getenv("ENVIRONMENT") == "production":
+    # Check multiple production environment indicators
+    is_prod = (
+        os.getenv("NODE_ENV") == "production" 
+        or os.getenv("ENVIRONMENT") == "production"
+        or os.getenv("RAILWAY_ENVIRONMENT") == "production"
+    )
+    if is_prod:
         raise ValueError(
             "CRITICAL SECURITY ERROR: JWT_SECRET is set to default value 'change-me-in-production'. "
             "This is not allowed in production. Please set a strong, random JWT_SECRET in your .env file."
