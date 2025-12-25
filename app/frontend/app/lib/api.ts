@@ -12,7 +12,14 @@ const getApiBaseUrl = (): string => {
   if (!url && typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
     console.warn('NEXT_PUBLIC_API_URL is not set in production! Please set it in Vercel environment variables.');
   }
-  return url || 'http://localhost:8000';
+  const apiUrl = url || 'http://localhost:8000';
+  
+  // Log the API URL in browser console for debugging (only in browser, not during SSR)
+  if (typeof window !== 'undefined') {
+    console.log('[HealthScan] API Base URL:', apiUrl);
+  }
+  
+  return apiUrl;
 };
 
 export const API_BASE_URL = getApiBaseUrl();

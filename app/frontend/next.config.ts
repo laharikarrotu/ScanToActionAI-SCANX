@@ -24,6 +24,34 @@ const nextConfig: NextConfig = {
   async headers() {
     const isProduction = process.env.NODE_ENV === 'production';
     
+    // Build connect-src directive dynamically based on API URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const connectSrc = [
+      "'self'",
+      "https://api.vercel.com",
+      "https://*.vercel.app",
+      "https://*.railway.app", // Allow all Railway deployments
+    ];
+    
+    // Add specific API URL if set (for additional security)
+    if (apiUrl) {
+      try {
+        const url = new URL(apiUrl);
+        // Add the origin (protocol + hostname) to connect-src
+        const origin = `${url.protocol}//${url.hostname}`;
+        if (!connectSrc.includes(origin)) {
+          connectSrc.push(origin);
+        }
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    
+    // In development, allow localhost
+    if (!isProduction) {
+      connectSrc.push("http://localhost:8000", "http://localhost:3000");
+    }
+    
     return [
       {
         source: '/:path*',
@@ -53,7 +81,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://api.vercel.com https://*.vercel.app",
+              `connect-src ${connectSrc.join(' ')}`,
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",
